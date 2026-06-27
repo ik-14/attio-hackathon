@@ -39,6 +39,12 @@ export const config = {
   checks: {
     requireReachable: bool(process.env.QR_REQUIRE_REACHABLE, false),
   },
+  brand: {
+    fetch: (process.env.BRAND_FETCH ?? "auto") as "auto" | "always" | "never",
+    fetchMissingLogo: bool(process.env.BRAND_FETCH_MISSING_LOGO, true),
+    brandfetchApiKey: process.env.BRANDFETCH_API_KEY ?? "",
+    timeoutMs: Number(process.env.BRAND_FETCH_TIMEOUT_MS ?? "8000"),
+  },
   outDir: process.env.OUT_DIR ?? "./out",
 };
 

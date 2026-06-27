@@ -16,6 +16,8 @@ npm install
 cp .env.example .env      # optional — runs fully offline without keys
 npm run demo              # → out/<tracking_id>/postcard.pdf (+ front/back/qr/brief/copy)
 npm run demo -- fixtures/no-hook.json   # exercises the needs_human gate
+npm run demo -- fixtures/fetch-brand-prospect.json   # Stage 0 fetch (no brand_kit on input)
+npm run fetch-brand stripe.com fintech  # smoke-test the brand-kit chain alone
 ```
 
 With **no API keys** it runs end to end on mocks: deterministic text + a branded
@@ -29,7 +31,7 @@ and cached).
 
 | Stage | What it does | Provider | Cut for hackathon? |
 |---|---|---|---|
-| 0 Brand kit | logo + palette + fonts | **hardcoded** (`brandKit.ts`) | ✅ fallback chain cut — supply on input |
+| 0 Brand kit | logo + palette + fonts | Brandfetch → Clearbit → scrape → sector fallback | optional `BRANDFETCH_API_KEY`; set `BRAND_FETCH=never` to skip |
 | 1 Distil | enrichment → brief, pick the one true hook (or `null`) | SIE `generate` → mock | — |
 | 2 Copy | postcard words, hook-led, QR CTA | SIE `generate` → mock | — |
 | 3a Image prompt | art-direct the front, no text/logo/QR | SIE `generate` → mock | — |
@@ -46,8 +48,8 @@ offline. SIE cold-starts (first call ~60s / 504) are retried once with
 ## Inputs / outputs
 
 `runMailJob(input: MailInput)` (see `src/types.ts`). `MailInput` is the precondition
-set from `postcard-generation-agent.md`: `prospect`, `enrichment[]`, `brand_kit`,
-`tracking_id`, `booking_url` (the `/r/:trackingId` tracked redirect — **not** a raw
+set from `postcard-generation-agent.md`: `prospect`, `enrichment[]`, optional `brand_kit`
+(omit to auto-fetch from `prospect.company_domain`), `tracking_id`, `booking_url` (the `/r/:trackingId` tracked redirect — **not** a raw
 Calendly URL), `attio_record_id`. Returns `MailResult` with `mail_status`
 (`sent` | `needs_human`), the `pdfPath`, and the Lob id/proof url.
 

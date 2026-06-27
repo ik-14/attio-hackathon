@@ -1,0 +1,28 @@
+{
+  "prospect": {
+    "first_name": "Jane",
+    "last_name": "Doe",
+    "title": "VP of Growth",
+    "company": "Stripe",
+    "company_domain": "stripe.com",
+    "industry": "fintech",
+    "email": "jane@stripe.com",
+    "postal_address": {
+      "line1": "210 King St",
+      "city": "San Francisco",
+      "state": "CA",
+      "postcode": "94107",
+      "country": "US"
+    }
+  },
+  "enrichment": [
+    {
+      "signal": "Expanded embedded finance APIs across Europe",
+      "source_url": "https://stripe.com/newsroom",
+      "published_date": "2026-06-20"
+    }
+  ],
+  "tracking_id": "trk_demo_stripe_fetch_001",
+  "booking_url": "https://example.com/r/trk_demo_stripe_fetch_001",
+  "attio_record_id": "rec_demo_stripe_fetch_001"
+}

@@ -1,4 +1,5 @@
 import { generateJSON } from "../clients/llmClient.js";
+import { resolveBrandKit } from "../brandKit.js";
 import type { Brief, MailInput } from "../types.js";
 
 // Stage 1 — distil enrichment → personalisation brief.
@@ -8,7 +9,8 @@ import type { Brief, MailInput } from "../types.js";
 const SYSTEM = `You are a creative director preparing ONE bespoke postcard for a cold prospect. From the enrichment signals provided, choose the single most specific, current, verifiably-true hook that proves we did our homework. Never invent facts; only use what is in the signals. If no strong, current hook exists, set "hook" to null. Use the supplied brand palette as-is. Output JSON only.`;
 
 export async function distil(input: MailInput): Promise<{ brief: Brief; via: string }> {
-  const { prospect, enrichment, brand_kit } = input;
+  const { prospect, enrichment } = input;
+  const brand_kit = resolveBrandKit(input.brand_kit, prospect.industry);
 
   const user = {
     prospect: {

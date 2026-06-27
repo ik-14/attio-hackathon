@@ -41,7 +41,8 @@ export interface BrandKit {
 export interface MailInput {
   prospect: Prospect;
   enrichment: EnrichmentSignal[];
-  brand_kit: BrandKit;
+  /** Omit or leave incomplete to auto-fetch via Stage 0 (domain → brand kit). */
+  brand_kit?: Partial<BrandKit>;
   tracking_id: string; // minted at discovery
   booking_url: string; // the tracked redirect https://<host>/r/:trackingId
   attio_record_id: string;

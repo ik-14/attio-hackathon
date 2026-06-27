@@ -6,6 +6,7 @@
   "description": "Workstream B — bespoke postcard generation module for the warm-up-then-strike outreach agent",
   "scripts": {
     "demo": "tsx src/demo.ts",
+    "fetch-brand": "tsx src/fetchBrandDemo.ts",
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },

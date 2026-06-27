@@ -1,6 +1,7 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { config } from "../config.js";
+import { ensureBrandKit } from "../brandKit.js";
 import { recordMailEvent } from "../clients/attioClient.js";
 import { distil } from "../stages/distil.js";
 import { writeCopy } from "../stages/copy.js";
@@ -13,8 +14,7 @@ import type { MailInput, MailResult } from "../types.js";
 
 // The postcard module = the body of the /jobs/mail handler. Runs Stage 1→6 for a
 // single `teaser_sent` lead idle 2+ days, fully autonomously. The ONLY human
-// touch is a failed Stage 5 check → mail_status = needs_human. Stage 0 (brand
-// kit) is cut and supplied on the input per execution-plan workstream B.
+// touch is a failed Stage 5 check → mail_status = needs_human.
 
 async function persist(trackingId: string, files: Record<string, Buffer | string>): Promise<Record<string, string>> {
   const dir = path.resolve(config.outDir, trackingId);
@@ -29,11 +29,17 @@ async function persist(trackingId: string, files: Record<string, Buffer | string
 }
 
 export async function runMailJob(input: MailInput): Promise<MailResult> {
-  const { tracking_id, attio_record_id, brand_kit, booking_url, prospect } = input;
+  const { tracking_id, attio_record_id, booking_url, prospect } = input;
   const log = (m: string) => console.log(`[mail ${tracking_id}] ${m}`);
 
+  // Stage 0 — brand kit (fetch when omitted/incomplete; supplied kit wins on merge).
+  const brand_kit = await ensureBrandKit(prospect.company_domain, prospect.industry, input.brand_kit);
+  log(`stage0 brand source=${brand_kit.source} palette=${brand_kit.palette.join(",")}`);
+
+  const jobInput = { ...input, brand_kit };
+
   // Stage 1–3a — text (SIE generate primary; mock keeps it running offline).
-  const { brief, via: v1 } = await distil(input);
+  const { brief, via: v1 } = await distil(jobInput);
   log(`stage1 distil via=${v1} hook=${brief.hook ? `"${brief.hook.slice(0, 48)}…"` : "NULL"}`);
 
   const { copy, via: v2 } = await writeCopy(brief, prospect);
@@ -92,7 +98,7 @@ export async function runMailJob(input: MailInput): Promise<MailResult> {
   });
 
   // Stage 6 — send via Lob (test mode) + write back.
-  const lob = await send(input, card);
+  const lob = await send(jobInput, card);
   await recordMailEvent({
     attio_record_id,
     mail_status: "sent",
