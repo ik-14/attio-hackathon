@@ -6,7 +6,11 @@ import type { Brief, MailInput } from "../types.js";
 // Pick the single strongest, current, verifiably-true hook. Never invent facts;
 // if no strong hook exists, hook = null (Stage 5 catches that and flags a human).
 
-const SYSTEM = `You are a creative director preparing ONE bespoke postcard for a cold prospect. From the enrichment signals provided, choose the single most specific, current, verifiably-true hook that proves we did our homework. Never invent facts; only use what is in the signals. If no strong, current hook exists, set "hook" to null. Use the supplied brand palette as-is. Output JSON only.`;
+const SYSTEM = `You are a creative director preparing ONE bespoke postcard for a cold prospect. From the enrichment signals provided, choose the single most specific, current, verifiably-true hook that proves we did our homework. Never invent facts; only use what is in the signals. If no strong, current hook exists, set "hook" to null. Use the supplied brand palette as-is.
+
+Use "sender_context" to inform why the hook is relevant to us reaching out — i.e. write "why_relevant" in a way that connects the prospect's news to what the sender does. Do not repeat the sender's description verbatim; just let it inform the angle.
+
+Output JSON only.`;
 
 export async function distil(input: MailInput): Promise<{ brief: Brief; via: string }> {
   const { prospect, enrichment } = input;
@@ -22,6 +26,7 @@ export async function distil(input: MailInput): Promise<{ brief: Brief; via: str
       // address deliberately omitted — never goes to the LLM
     },
     enrichment,
+    sender_context: input.sender,
     palette: brand_kit.palette,
     fonts: brand_kit.fonts,
   };
@@ -47,7 +52,8 @@ export async function distil(input: MailInput): Promise<{ brief: Brief; via: str
     };
   };
 
-  const { value, via } = await generateJSON<Brief>({ system: SYSTEM, user, mock, label: "stage1.distil" });
+  // Low temperature — hook selection is a fact-picking task, not a creative one.
+  const { value, via } = await generateJSON<Brief>({ system: SYSTEM, user, mock, label: "stage1.distil", temperature: 0.1 });
 
   // Normalise: a live model may omit fields. Preserve an intentional null hook
   // (Stage 5 must still catch it) but backfill the rest so downstream never breaks.

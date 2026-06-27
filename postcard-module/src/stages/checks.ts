@@ -13,6 +13,8 @@ const jsQR = ((jsQRModule as any).default ?? jsQRModule) as typeof import("jsqr"
 
 const HEADLINE_MAX_WORDS = 8;
 const BODY_MAX_CHARS = 320;
+const MIN_PRINT_FONT_SIZE = 20;
+const MIN_QR_PX = 235; // just over 2cm at 300dpi, with the rendered QR currently larger.
 
 async function decodeQr(qrPng: Buffer): Promise<string | null> {
   const { data, info } = await sharp(qrPng)
@@ -55,11 +57,41 @@ export async function runChecks(
   add("headline_length", words <= HEADLINE_MAX_WORDS, `${words} words`);
   add("body_length", copy.body.length <= BODY_MAX_CHARS, `${copy.body.length} chars`);
 
-  // 3. Image present at the right dimensions.
-  const meta = await sharp(card.frontPng).metadata();
-  add("image_present", !!meta.width && meta.width >= 1500, `${meta.width}×${meta.height}`);
+  // 3. Production-design checks. Compose owns geometry, but Stage 5 enforces
+  //    the contract before anything is mailed without a human proofread.
+  const layoutFailures = card.layout.text
+    .filter((t) => !t.fits)
+    .map((t) => `${t.name}: ${t.detail ?? "overflow"}`);
+  add("layout_text_fit", layoutFailures.length === 0, layoutFailures.join("; ") || "all text boxes fit");
+  add(
+    "layout_no_collisions",
+    card.layout.collisions.length === 0,
+    card.layout.collisions.join("; ") || "no overlaps",
+  );
 
-  // 4. QR resolves — decode it back to booking_url, then (optionally) confirm the
+  // Verify no back text box bleeds into Lob's address/postage area. Overlap here
+  // means text is physically printed under the address on the real card.
+  const lobX = card.layout.safeAreas.lobReserved.x;
+  const lobViolations = card.layout.text
+    .filter((t) => t.name.startsWith("back.") && t.bounds.x + t.bounds.w > lobX)
+    .map((t) => `${t.name} right edge ${t.bounds.x + t.bounds.w}px > lob split ${lobX}px`);
+  add("lob_clearance", lobViolations.length === 0, lobViolations.join("; ") || `all text clears lob at x=${lobX}px`);
+
+  const smallestFont = Math.min(...card.layout.text.map((t) => t.fontSize));
+  add("layout_min_font_size", smallestFont >= MIN_PRINT_FONT_SIZE, `${smallestFont}px minimum`);
+  add(
+    "qr_print_size",
+    card.layout.safeAreas.qr.w >= MIN_QR_PX && card.layout.safeAreas.qr.h >= MIN_QR_PX,
+    `${card.layout.safeAreas.qr.w}×${card.layout.safeAreas.qr.h}px`,
+  );
+
+  // 4. Image present at the right dimensions.
+  const frontMeta = await sharp(card.frontPng).metadata();
+  const backMeta = await sharp(card.backPng).metadata();
+  add("front_image_present", !!frontMeta.width && frontMeta.width >= 1500, `${frontMeta.width}×${frontMeta.height}`);
+  add("back_image_present", !!backMeta.width && backMeta.width >= 1500, `${backMeta.width}×${backMeta.height}`);
+
+  // 5. QR resolves — decode it back to booking_url, then (optionally) confirm the
   //    redirect host actually resolves. Decode always runs; reachability is opt-in
   //    so the module runs offline during prep (set QR_REQUIRE_REACHABLE on stage).
   const decoded = await decodeQr(card.qrPng);

@@ -37,12 +37,22 @@ export interface BrandKit {
   source: BrandKitSource;
 }
 
+/** Who the sender is — sourced from Attio ICP config in production, env/fallback for demo. */
+export interface SenderContext {
+  /** One-liner about what the sender does — woven into the postcard body copy. */
+  what_we_do: string;
+  /** Brief description of the sender's ICP — helps Gemini reason about relevance. */
+  icp_description: string;
+}
+
 // Stage 4 input — the full precondition set (postcard-generation-agent.md §Inputs)
 export interface MailInput {
   prospect: Prospect;
   enrichment: EnrichmentSignal[];
   /** Omit or leave incomplete to auto-fetch via Stage 0 (domain → brand kit). */
   brand_kit?: Partial<BrandKit>;
+  /** Who we are and who we target — falls back to SENDER_* env vars if omitted. */
+  sender?: SenderContext;
   tracking_id: string; // minted at discovery
   booking_url: string; // the tracked redirect https://<host>/r/:trackingId
   attio_record_id: string;
@@ -80,12 +90,50 @@ export interface GeneratedImage {
   cached: boolean;
 }
 
+export interface LayoutRect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+export interface TextLayout {
+  name: string;
+  box: LayoutRect;
+  bounds: LayoutRect;
+  lines: string[];
+  fontSize: number;
+  lineHeight: number;
+  minFontSize: number;
+  maxLines: number;
+  fits: boolean;
+  detail?: string;
+}
+
+export interface LayoutDiagnostics {
+  template: "hero_front_message_back";
+  size: { width: number; height: number; dpi: number; safeMargin: number };
+  safeAreas: {
+    logo: LayoutRect;
+    frontHeadline: LayoutRect;
+    backMessage: LayoutRect;
+    qr: LayoutRect;
+    cta: LayoutRect;
+    link: LayoutRect;
+    signOff: LayoutRect;
+    lobReserved: LayoutRect;
+  };
+  text: TextLayout[];
+  collisions: string[];
+}
+
 // Stage 4 output
 export interface ComposedCard {
   frontPng: Buffer;
   backPng: Buffer;
   qrPng: Buffer;
   pdf: Buffer;
+  layout: LayoutDiagnostics;
 }
 
 // Stage 5 output

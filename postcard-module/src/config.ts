@@ -5,12 +5,7 @@ const bool = (v: string | undefined, def = false) =>
 
 export const config = {
   text: {
-    provider: (process.env.TEXT_LLM_PROVIDER ?? "sie") as "sie" | "gemini" | "mock",
-    sie: {
-      baseUrl: process.env.SIE_BASE_URL ?? "https://api.superlinked.com",
-      apiKey: process.env.SIE_API_KEY ?? "",
-      model: process.env.SIE_TEXT_MODEL ?? "Qwen/Qwen3-4B-Instruct-2507",
-    },
+    provider: (process.env.TEXT_LLM_PROVIDER ?? "gemini") as "gemini" | "mock",
     gemini: {
       apiKey: process.env.GEMINI_API_KEY ?? "",
       model: process.env.GEMINI_TEXT_MODEL ?? "gemini-3.5-flash",
@@ -39,11 +34,26 @@ export const config = {
   checks: {
     requireReachable: bool(process.env.QR_REQUIRE_REACHABLE, false),
   },
+  // In production the QR encodes /r/:trackingId (the tracking redirect that
+  // logs engagement in Attio then forwards to Calendly). For demo runs, set
+  // CALENDLY_URL to override the fixture booking_url so the QR scans to a
+  // real Calendly page directly — useful for testing without a live redirect.
+  calendly: {
+    url: process.env.CALENDLY_URL ?? "",
+  },
   brand: {
     fetch: (process.env.BRAND_FETCH ?? "auto") as "auto" | "always" | "never",
     fetchMissingLogo: bool(process.env.BRAND_FETCH_MISSING_LOGO, true),
     brandfetchApiKey: process.env.BRANDFETCH_API_KEY ?? "",
     timeoutMs: Number(process.env.BRAND_FETCH_TIMEOUT_MS ?? "8000"),
+  },
+  sender: {
+    whatWeDo:
+      process.env.SENDER_WHAT_WE_DO ??
+      "We send autonomous, AI-personalised physical outreach to your ICP — a real postcard, no manual work.",
+    icpDescription:
+      process.env.SENDER_ICP_DESCRIPTION ??
+      "B2B sales teams and founders who want to stand out with personalised outreach at scale.",
   },
   outDir: process.env.OUT_DIR ?? "./out",
 };

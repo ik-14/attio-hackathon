@@ -17,9 +17,14 @@
   },
   "enrichment": [
     {
-      "signal": "Expanded embedded finance APIs across Europe",
-      "source_url": "https://stripe.com/newsroom",
-      "published_date": "2026-06-20"
+      "signal": "Stripe launched Stablecoin Financial Accounts in 101 countries, enabling businesses to hold and move money in USDC and USDB",
+      "source_url": "https://stripe.com/newsroom/news/stablecoin-financial-accounts",
+      "published_date": "2026-06-25"
+    },
+    {
+      "signal": "Stripe is hiring 200+ engineers across its London and Dublin offices in 2026",
+      "source_url": "https://stripe.com/jobs",
+      "published_date": "2026-06-10"
     }
   ],
   "tracking_id": "trk_demo_stripe_fetch_001",

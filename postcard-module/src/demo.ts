@@ -2,6 +2,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { runMailJob } from "./jobs/mail.js";
+import { config } from "./config.js";
 import type { MailInput } from "./types.js";
 
 // Runnable end-to-end demo for the one rehearsed prospect.
@@ -20,6 +21,14 @@ async function main() {
     : path.resolve(__dirname, "../fixtures/rehearsed-prospect.json");
 
   const input = JSON.parse(await fs.readFile(fixturePath, "utf8")) as MailInput;
+
+  // CALENDLY_URL override — useful for demo prep when the /r/:trackingId
+  // redirect isn't live yet. In production the fixture/MailInput always uses
+  // the tracking redirect, which forwards to Calendly after logging engagement.
+  if (config.calendly.url) {
+    input.booking_url = config.calendly.url;
+    console.log(`[demo] CALENDLY_URL set — QR will encode: ${config.calendly.url}`);
+  }
 
   console.log(`\n=== Postcard module — ${input.prospect.company} (${input.tracking_id}) ===\n`);
   const result = await runMailJob(input);

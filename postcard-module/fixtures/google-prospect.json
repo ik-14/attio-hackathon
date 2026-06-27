@@ -1,0 +1,33 @@
+{
+  "prospect": {
+    "first_name": "Sarah",
+    "last_name": "Chen",
+    "title": "VP of Sales",
+    "company": "Google",
+    "company_domain": "google.com",
+    "industry": "saas",
+    "email": "sarah.chen@google.com",
+    "postal_address": {
+      "line1": "1600 Amphitheatre Parkway",
+      "city": "Mountain View",
+      "state": "CA",
+      "postcode": "94043",
+      "country": "US"
+    }
+  },
+  "enrichment": [
+    {
+      "signal": "Google Cloud crossed $12bn in quarterly revenue for the first time, up 28% year-on-year, driven by enterprise AI adoption",
+      "source_url": "https://abc.xyz/investor/earnings/2026-q1",
+      "published_date": "2026-06-15"
+    },
+    {
+      "signal": "Google is expanding its Cloud sales team by 1,500 people globally in 2026 to meet enterprise demand",
+      "source_url": "https://cloud.google.com/blog/enterprise-expansion-2026",
+      "published_date": "2026-06-01"
+    }
+  ],
+  "tracking_id": "trk_demo_google_001",
+  "booking_url": "https://example.com/r/trk_demo_google_001",
+  "attio_record_id": "rec_demo_google_001"
+}

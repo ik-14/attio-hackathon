@@ -36,8 +36,8 @@ and cached).
 | 2 Copy | postcard words, hook-led, QR CTA | SIE `generate` → mock | — |
 | 3a Image prompt | art-direct the front, no text/logo/QR | SIE `generate` → mock | — |
 | 3b Image | the front render | **Google Gemini** → flash → placeholder, cached by `tracking_id` | image is Gemini-only (settled) |
-| 4 Compose | deterministic layout: image + headline + logo (front); copy + QR + link (back); 4×6 @ 300dpi PDF | code (`sharp`/`qrcode`/`pdf-lib`) | — |
-| 5 Checks | hook non-null + QR decodes to `booking_url`; save PDF/assets; set `mail_status` | code | kept the 2 essential checks |
+| 4 Compose | deterministic design layout: image + fitted headline + logo (front); fitted copy + QR + link (back); 4×6 @ 300dpi PDF + `layout.json` | code (`sharp`/`qrcode`/`pdf-lib`) | — |
+| 5 Checks | hook non-null + text-fit/collision checks + QR decodes to `booking_url`; save PDF/assets; set `mail_status` | code | kept the essential checks |
 | 6 Send | Lob test mode → proof PDF; write back to Attio | Lob | — |
 
 Text stages default to **SIE `generate`** (`TEXT_LLM_PROVIDER=sie`); set
@@ -54,7 +54,7 @@ Calendly URL), `attio_record_id`. Returns `MailResult` with `mail_status`
 (`sent` | `needs_human`), the `pdfPath`, and the Lob id/proof url.
 
 Assets land in `out/<tracking_id>/`: `postcard.pdf`, `front.png`, `back.png`,
-`qr.png`, `brief.json`, `copy.json`, `image-prompt.json`.
+`qr.png`, `brief.json`, `copy.json`, `image-prompt.json`, `layout.json`.
 
 ## Integration notes for the rest of the team
 

@@ -32,17 +32,23 @@ export async function runMailJob(input: MailInput): Promise<MailResult> {
   const { tracking_id, attio_record_id, booking_url, prospect } = input;
   const log = (m: string) => console.log(`[mail ${tracking_id}] ${m}`);
 
+  // Resolve sender context — from input (Attio ICP config) or env fallback.
+  const sender = input.sender ?? {
+    what_we_do: config.sender.whatWeDo,
+    icp_description: config.sender.icpDescription,
+  };
+
   // Stage 0 — brand kit (fetch when omitted/incomplete; supplied kit wins on merge).
   const brand_kit = await ensureBrandKit(prospect.company_domain, prospect.industry, input.brand_kit);
   log(`stage0 brand source=${brand_kit.source} palette=${brand_kit.palette.join(",")}`);
 
-  const jobInput = { ...input, brand_kit };
+  const jobInput = { ...input, brand_kit, sender };
 
-  // Stage 1–3a — text (SIE generate primary; mock keeps it running offline).
+  // Stage 1–3a — text stages use Gemini; deterministic mock fallback keeps pipeline running offline.
   const { brief, via: v1 } = await distil(jobInput);
   log(`stage1 distil via=${v1} hook=${brief.hook ? `"${brief.hook.slice(0, 48)}…"` : "NULL"}`);
 
-  const { copy, via: v2 } = await writeCopy(brief, prospect);
+  const { copy, via: v2 } = await writeCopy(brief, prospect, sender);
   log(`stage2 copy via=${v2} headline="${copy.headline}"`);
 
   const { prompt, via: v3 } = await authorImagePrompt(brief);
@@ -62,6 +68,7 @@ export async function runMailJob(input: MailInput): Promise<MailResult> {
     "brief.json": JSON.stringify(brief, null, 2),
     "copy.json": JSON.stringify(copy, null, 2),
     "image-prompt.json": JSON.stringify(prompt, null, 2),
+    "layout.json": JSON.stringify(card.layout, null, 2),
     "front.png": card.frontPng,
     "back.png": card.backPng,
     "qr.png": card.qrPng,
