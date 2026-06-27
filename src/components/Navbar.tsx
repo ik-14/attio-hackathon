@@ -10,12 +10,12 @@ export default function Navbar() {
   return (
     <>
       <header className="fixed top-4 left-0 right-0 z-50 px-6 lg:px-16">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
+        <div className="max-w-7xl mx-auto flex items-center justify-between relative">
           {/* Left: Spacer to keep layout balanced */}
           <div className="w-12 h-12 hidden md:block" />
 
-          {/* Center: Desktop Links (Pill Container) */}
-          <nav className="hidden md:flex items-center justify-center">
+          {/* Center: Desktop Links (Pill Container) — absolutely centred */}
+          <nav className="hidden md:flex items-center justify-center absolute left-1/2 -translate-x-1/2">
             <div className="liquid-glass rounded-full px-2 py-1.5 flex items-center gap-1">
               {links.map((link) => (
                 <a
