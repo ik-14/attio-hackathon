@@ -1,0 +1,6 @@
+{
+  "name": "AI Web Design Agency",
+  "description": "A dark, premium, single-page landing page with liquid glass effects for an AI-powered web design agency.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
