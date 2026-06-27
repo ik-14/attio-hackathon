@@ -1,0 +1,39 @@
+{
+  "prospect": {
+    "first_name": "Jane",
+    "last_name": "Doe",
+    "title": "VP of Growth",
+    "company": "Northwind Coffee",
+    "company_domain": "northwindcoffee.com",
+    "industry": "retail",
+    "email": "jane@northwindcoffee.com",
+    "postal_address": {
+      "line1": "210 King St",
+      "city": "San Francisco",
+      "state": "CA",
+      "postcode": "94107",
+      "country": "US"
+    }
+  },
+  "enrichment": [
+    {
+      "signal": "Closed a $6m Series A and is opening a flagship Shoreditch store",
+      "source_url": "https://techcrunch.com/northwind-series-a",
+      "published_date": "2026-06-20"
+    },
+    {
+      "signal": "Hiring 4 retail-ops roles in London",
+      "source_url": "https://northwindcoffee.com/careers",
+      "published_date": "2026-06-10"
+    }
+  ],
+  "brand_kit": {
+    "logo_url": null,
+    "palette": ["#0b3d2e", "#f2e9dc", "#c9a23f"],
+    "fonts": ["Helvetica", "Arial", "sans-serif"],
+    "source": "fallback"
+  },
+  "tracking_id": "trk_demo_northwind_001",
+  "booking_url": "https://example.com/r/trk_demo_northwind_001",
+  "attio_record_id": "rec_demo_northwind_001"
+}

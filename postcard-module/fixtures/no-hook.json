@@ -1,0 +1,13 @@
+{
+  "prospect": {
+    "first_name": "Sam", "last_name": "Lee", "title": "COO",
+    "company": "Quiet Harbor Labs", "company_domain": "quietharbor.example",
+    "industry": "saas", "email": "sam@quietharbor.example",
+    "postal_address": { "line1": "1 Test Way", "city": "Austin", "state": "TX", "postcode": "73301", "country": "US" }
+  },
+  "enrichment": [],
+  "brand_kit": { "logo_url": null, "palette": ["#0a2540", "#f6f9fc", "#635bff"], "fonts": ["Helvetica"], "source": "fallback" },
+  "tracking_id": "trk_demo_nohook_001",
+  "booking_url": "https://example.com/r/trk_demo_nohook_001",
+  "attio_record_id": "rec_demo_nohook_001"
+}
