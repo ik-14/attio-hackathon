@@ -1,4 +1,4 @@
-// ── Strike shared types ── single source of truth for the FE↔BE contract.
+// ── Reachd shared types ── single source of truth for the FE↔BE contract.
 // (BACKEND-PLAN §3). Additive-only: never rename a field without updating both
 // the API routes (app/api/*) and the UI (app/*, components/*).
 

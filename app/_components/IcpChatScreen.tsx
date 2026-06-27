@@ -64,7 +64,7 @@ export default function IcpChatScreen({ onDiscoveryStarted }: Props) {
       setMessages([
         {
           role: "assistant",
-          content: `Hi! I'm Strike. Tell me who you want to reach — I've pre-filled some defaults from your Attio data.\n\nCurrently targeting: ${defaultDesc}.\n\nJust describe your ideal customer in plain English — or hit "Start finding leads" to go with the defaults.`,
+          content: `Hi! I'm Reachd. Tell me who you want to reach — I've pre-filled some defaults from your Attio data.\n\nCurrently targeting: ${defaultDesc}.\n\nJust describe your ideal customer in plain English — or hit "Start finding leads" to go with the defaults.`,
         },
       ]);
     })();
@@ -97,9 +97,9 @@ export default function IcpChatScreen({ onDiscoveryStarted }: Props) {
     const result = await triggerJob("discover");
     if (!result.ok) {
       // graceful: still transition (fixture will handle polling)
-      console.warn("[Strike] discover job returned ok=false, proceeding anyway");
+      console.warn("[Reachd] discover job returned ok=false, proceeding anyway");
     }
-    toast("Discovery started — Strike is searching for your ICP");
+    toast("Discovery started — Reachd is searching for your ICP");
     onDiscoveryStarted();
   }
 
@@ -212,7 +212,7 @@ export default function IcpChatScreen({ onDiscoveryStarted }: Props) {
               <div
                 style={{ fontWeight: 800, fontSize: 17, color: "var(--strike-text)" }}
               >
-                Strike
+                Reachd
               </div>
               <div style={{ fontSize: 11.5, color: "var(--strike-text-faint)" }}>
                 Autonomous outreach for Attio

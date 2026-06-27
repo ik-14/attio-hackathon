@@ -117,7 +117,7 @@
   --sidebar-ring: oklch(0.556 0 0);
 }
 
-/* ── Strike design tokens ──────────────────────────────────────────────────── */
+/* ── Reachd design tokens ──────────────────────────────────────────────────── */
 :root {
   --strike-bg: #f6f6fb;
   --strike-surface: #ffffff;
@@ -143,7 +143,7 @@
   --strike-radius-sm: 9px;
 }
 
-/* ── Strike animations ─────────────────────────────────────────────────────── */
+/* ── Reachd animations ─────────────────────────────────────────────────────── */
 @keyframes strike-fade-up {
   from { opacity: 0; transform: translateY(14px); }
   to   { opacity: 1; transform: translateY(0); }
