@@ -111,18 +111,9 @@ export interface TextLayout {
 }
 
 export interface LayoutDiagnostics {
-  template: "hero_front_message_back";
+  template: string;
   size: { width: number; height: number; dpi: number; safeMargin: number };
-  safeAreas: {
-    logo: LayoutRect;
-    frontHeadline: LayoutRect;
-    backMessage: LayoutRect;
-    qr: LayoutRect;
-    cta: LayoutRect;
-    link: LayoutRect;
-    signOff: LayoutRect;
-    lobReserved: LayoutRect;
-  };
+  safeAreas: Record<string, LayoutRect>;
   text: TextLayout[];
   collisions: string[];
 }

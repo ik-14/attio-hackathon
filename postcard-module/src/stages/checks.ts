@@ -12,7 +12,7 @@ import type { Brief, CheckResult, ComposedCard, Copy } from "../types.js";
 const jsQR = ((jsQRModule as any).default ?? jsQRModule) as typeof import("jsqr").default;
 
 const HEADLINE_MAX_WORDS = 8;
-const BODY_MAX_CHARS = 320;
+const BODY_MAX_CHARS = 160; // front text box fits ~3 lines at 36px on a 1000px column
 const MIN_PRINT_FONT_SIZE = 20;
 const MIN_QR_PX = 235; // just over 2cm at 300dpi, with the rendered QR currently larger.
 
@@ -68,14 +68,6 @@ export async function runChecks(
     card.layout.collisions.length === 0,
     card.layout.collisions.join("; ") || "no overlaps",
   );
-
-  // Verify no back text box bleeds into Lob's address/postage area. Overlap here
-  // means text is physically printed under the address on the real card.
-  const lobX = card.layout.safeAreas.lobReserved.x;
-  const lobViolations = card.layout.text
-    .filter((t) => t.name.startsWith("back.") && t.bounds.x + t.bounds.w > lobX)
-    .map((t) => `${t.name} right edge ${t.bounds.x + t.bounds.w}px > lob split ${lobX}px`);
-  add("lob_clearance", lobViolations.length === 0, lobViolations.join("; ") || `all text clears lob at x=${lobX}px`);
 
   const smallestFont = Math.min(...card.layout.text.map((t) => t.fontSize));
   add("layout_min_font_size", smallestFont >= MIN_PRINT_FONT_SIZE, `${smallestFont}px minimum`);

@@ -7,11 +7,11 @@ import type { Brief, Copy, Prospect, SenderContext } from "../types.js";
 
 const SYSTEM = `You write short, warm, non-salesy direct-mail copy for a cold prospect who may have received a teaser that something physical was coming. Reference the hook naturally — show we paid attention. Weave in what the sender does (from "sender_context.what_we_do") naturally in the body — one sentence, no jargon, not salesy. Build curiosity and nudge them to scan the QR to book time. No hard pitch.
 
-HARD CHARACTER LIMITS — the card is physically small, these MUST be respected:
+HARD CHARACTER LIMITS — all text appears on the front of the card, these MUST be respected:
 - headline: max 8 words
-- personal_line: max 100 characters (one punchy sentence — this is physically the least space on the card)
-- body: max 200 characters (1-2 short sentences)
-- cta: max 80 characters (one line)
+- personal_line: max 80 characters (2 short lines on front)
+- body: max 150 characters (3 short lines on front)
+- cta: max 60 characters (bold accent line above the QR code)
 - sign_off: max 40 characters
 
 You MUST respond with a JSON object using EXACTLY these field names:
