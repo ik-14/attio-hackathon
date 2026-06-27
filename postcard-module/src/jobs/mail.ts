@@ -59,7 +59,7 @@ export async function runMailJob(input: MailInput): Promise<MailResult> {
   log(`stage3b image via=${image.model}${image.cached ? " (cached)" : ""}`);
 
   // Stage 4 — deterministic compose.
-  const card = await compose(image.png, copy, brand_kit, booking_url, prospect.company);
+  const card = await compose(image.png, copy, brand_kit, booking_url);
   log(`stage4 composed front+back+QR, pdf=${card.pdf.length}b`);
 
   // Stage 5 — automated checks + save assets for traceability.

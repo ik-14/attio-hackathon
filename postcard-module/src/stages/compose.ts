@@ -1,7 +1,7 @@
 import QRCode from "qrcode";
 import sharp from "sharp";
 import { PDFDocument } from "pdf-lib";
-import { fetchImagePng, wordmarkPng, escapeXml } from "../util/assets.js";
+import { escapeXml } from "../util/assets.js";
 import type { BrandKit, ComposedCard, Copy, LayoutDiagnostics, LayoutRect, TextLayout } from "../types.js";
 
 // Stage 4 — compose deterministically (code, not AI). Layout, logo, QR,
@@ -10,8 +10,30 @@ import type { BrandKit, ComposedCard, Copy, LayoutDiagnostics, LayoutRect, TextL
 
 const FULL_W = 1875;
 const FULL_H = 1275;
-const SAFE = 75;
-const QR_PX = 320; // ≈ 2.7 cm at 300dpi — comfortably above the ~2cm floor
+const SAFE   = 75;
+const QR_PX  = 320; // used for QR generation buffer; layout uses its own QR_SIZE
+
+// ---------------------------------------------------------------------------
+// Luminance utilities — drive the dark/light text decision from the palette.
+// ---------------------------------------------------------------------------
+
+function hexToLinear(c: number): number {
+  return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+}
+
+function relativeLuminance(hex: string): number {
+  const h = hex.replace("#", "");
+  const full = h.length === 3 ? h.split("").map((c) => c + c).join("") : h;
+  if (full.length !== 6) return 0;
+  const r = hexToLinear(parseInt(full.slice(0, 2), 16) / 255);
+  const g = hexToLinear(parseInt(full.slice(2, 4), 16) / 255);
+  const b = hexToLinear(parseInt(full.slice(4, 6), 16) / 255);
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+function isDarkColor(hex: string): boolean {
+  return relativeLuminance(hex) < 0.35;
+}
 // ---------------------------------------------------------------------------
 // Brand-aware font resolution
 // SVG is rendered by librsvg, so only system fonts are available. We classify
@@ -214,81 +236,76 @@ function findText(layout: LayoutDiagnostics, name: string): TextLayout {
   return found;
 }
 
-function readableLink(bookingUrl: string): string {
-  try {
-    const u = new URL(bookingUrl);
-    return `${u.host}${u.pathname}`;
-  } catch {
-    return bookingUrl.replace(/^https?:\/\//, "");
-  }
-}
 
 function planLayout(copy: Copy, bookingUrl: string): LayoutDiagnostics {
-  // All content (text + QR) lives on the FRONT. The back is a clean brand
-  // graphic — Lob prints the address and postage directly onto it with nothing
-  // from us to conflict with.
+  // Design system:
+  //   • All content and QR live on the FRONT; back is clean brand fill for Lob.
+  //   • Single left-aligned text column — strict margin grid, no right column.
+  //   • QR sits in the BOTTOM-RIGHT corner (opposite diagonal to the headline).
+  //   • Label "Scan to schedule a chat" is flush below the QR, ≤ QR width.
+  //   • Every element shares the same x=SAFE left margin or x=QR_X right anchor.
 
-  const TEXT_W   = 1000;                        // left text column width
-  const QR_SIZE  = 285;                         // QR px on front
-  const QR_X     = FULL_W - SAFE - QR_SIZE;    // 1515px — right-aligned
-  const QR_Y     = Math.round(FULL_H * 0.665); // 848px
-  const QR_COL_X = TEXT_W + SAFE + 55;         // 1130px — right column start
+  const TEXT_W   = 900;  // text column width — leaves clear space to QR
+  const QR_SIZE  = 240;  // compact QR — scannable but not dominant
+  const QR_X     = FULL_W - SAFE - QR_SIZE;   // 1560px
+  const LABEL_H  = 52;
+  const QR_GAP   = 14;   // gap between QR and its label
+  const QR_Y     = FULL_H - SAFE - QR_SIZE - QR_GAP - LABEL_H; // 844px
 
-  const HEADLINE_TOP = Math.round(FULL_H * 0.385); // 490px
-  const HEADLINE_H   = 300;
-  const PERSONAL_H   = 100;
-  const BODY_H       = 130;
-  const SIGNOFF_H    = 50;
-  const CTA_H        = 90;
-  const GAP          = 10;
+  // Vertical rhythm — headline anchored well below top safe edge for breathing room
+  const HEADLINE_Y = 220;
+  const HEADLINE_H = 290;
+  const GAP_LG    = 30;
+  const GAP_SM    = 18;
 
-  const personalY = HEADLINE_TOP + HEADLINE_H + GAP;
-  const bodyY     = personalY + PERSONAL_H + GAP;
-  const signOffY  = bodyY + BODY_H + 15;
-  const ctaY      = QR_Y - CTA_H - 12;
-  const linkY     = QR_Y + QR_SIZE + 15;
+  const personalY = HEADLINE_Y + HEADLINE_H + GAP_LG;  // 540
+  const bodyY     = personalY + 100 + GAP_SM;           // 658
+  const ctaY      = bodyY    + 130 + GAP_SM;            // 806
+  const signOffY  = ctaY    + 90  + 10;                 // 906
+  const labelY    = QR_Y + QR_SIZE + QR_GAP;            // 1098
 
   const safeAreas = {
-    logo: { x: SAFE, y: SAFE, w: 280, h: 100 },
-    qr:   { x: QR_X, y: QR_Y, w: QR_SIZE, h: QR_SIZE },
+    qr:    { x: QR_X,   y: QR_Y,  w: QR_SIZE, h: QR_SIZE },
+    label: { x: QR_X,   y: labelY, w: QR_SIZE, h: LABEL_H },
   };
 
   const text = [
     fitTextToBox({
       name: "front.headline",
       text: copy.headline,
-      box: { x: SAFE, y: HEADLINE_TOP, w: TEXT_W, h: HEADLINE_H },
-      maxFontSize: 90, minFontSize: 60, lineHeightRatio: 1.12, maxLines: 3,
+      box: { x: SAFE, y: HEADLINE_Y, w: TEXT_W, h: HEADLINE_H },
+      maxFontSize: 90, minFontSize: 64, lineHeightRatio: 1.10, maxLines: 3,
     }),
     fitTextToBox({
       name: "front.personalLine",
       text: copy.personal_line,
-      box: { x: SAFE, y: personalY, w: TEXT_W, h: PERSONAL_H },
-      maxFontSize: 42, minFontSize: 32, lineHeightRatio: 1.25, maxLines: 2,
+      box: { x: SAFE, y: personalY, w: TEXT_W, h: 100 },
+      maxFontSize: 40, minFontSize: 30, lineHeightRatio: 1.25, maxLines: 2,
     }),
     fitTextToBox({
       name: "front.body",
       text: copy.body,
-      box: { x: SAFE, y: bodyY, w: TEXT_W, h: BODY_H },
-      maxFontSize: 36, minFontSize: 28, lineHeightRatio: 1.28, maxLines: 3,
-    }),
-    fitTextToBox({
-      name: "front.signOff",
-      text: copy.sign_off,
-      box: { x: SAFE, y: signOffY, w: 600, h: SIGNOFF_H },
-      maxFontSize: 28, minFontSize: 22, lineHeightRatio: 1.15, maxLines: 1,
+      box: { x: SAFE, y: bodyY, w: TEXT_W, h: 130 },
+      maxFontSize: 34, minFontSize: 26, lineHeightRatio: 1.30, maxLines: 3,
     }),
     fitTextToBox({
       name: "front.cta",
       text: copy.cta,
-      box: { x: QR_COL_X, y: ctaY, w: FULL_W - QR_COL_X - SAFE, h: CTA_H },
-      maxFontSize: 36, minFontSize: 28, lineHeightRatio: 1.25, maxLines: 2,
+      box: { x: SAFE, y: ctaY, w: TEXT_W, h: 90 },
+      maxFontSize: 28, minFontSize: 22, lineHeightRatio: 1.25, maxLines: 2,
     }),
     fitTextToBox({
-      name: "front.link",
-      text: readableLink(bookingUrl),
-      box: { x: QR_COL_X, y: linkY, w: FULL_W - QR_COL_X - SAFE, h: 42 },
+      name: "front.signOff",
+      text: copy.sign_off,
+      box: { x: SAFE, y: signOffY, w: 500, h: 40 },
       maxFontSize: 24, minFontSize: 18, lineHeightRatio: 1.15, maxLines: 1,
+    }),
+    // Fixed label — not from copy, always the same call-to-action beneath the QR.
+    fitTextToBox({
+      name: "front.label",
+      text: "Scan to schedule\na chat",
+      box: safeAreas.label,
+      maxFontSize: 22, minFontSize: 16, lineHeightRatio: 1.28, maxLines: 2,
     }),
   ];
 
@@ -300,18 +317,15 @@ function planLayout(copy: Copy, bookingUrl: string): LayoutDiagnostics {
       }
     }
   }
-  const hl = text.find((t) => t.name === "front.headline");
-  if (hl && rectsOverlap(hl.bounds, safeAreas.logo)) {
-    collisions.push("front.headline overlaps logo");
-  }
-  for (const t of text) {
+  // No text element (other than the label itself) should touch the QR area.
+  for (const t of text.filter((t) => t.name !== "front.label")) {
     if (rectsOverlap(t.bounds, safeAreas.qr)) {
       collisions.push(`${t.name} overlaps qr`);
     }
   }
 
   return {
-    template: "all_front_clean_back",
+    template: "minimal_left_qr_bottomright",
     size: { width: FULL_W, height: FULL_H, dpi: 300, safeMargin: SAFE },
     safeAreas,
     text,
@@ -322,7 +336,6 @@ function planLayout(copy: Copy, bookingUrl: string): LayoutDiagnostics {
 async function buildFront(
   imagePng: Buffer,
   brand: BrandKit,
-  company: string,
   layout: LayoutDiagnostics,
   qrPng: Buffer,
   fontStack: string,
@@ -333,80 +346,75 @@ async function buildFront(
   const headline = findText(layout, "front.headline");
   const personal = findText(layout, "front.personalLine");
   const body     = findText(layout, "front.body");
-  const signOff  = findText(layout, "front.signOff");
   const cta      = findText(layout, "front.cta");
-  const link     = findText(layout, "front.link");
+  const signOff  = findText(layout, "front.signOff");
+  const label    = findText(layout, "front.label");
   const qr       = layout.safeAreas.qr;
 
-  const accent        = brand.palette[2] ?? "#c9a23f";
-  const letterSpacing = isSerif ? "0" : "-1";
+  // Contrast-safe text colors derived from the dominant brand color.
+  // Dark background → white text; light background → near-black text.
+  const bgHex    = brand.palette[0] ?? "#1a1a2e";
+  const dark     = isDarkColor(bgHex);
+  const textFull = dark ? "#ffffff"              : "#0d0d0d";
+  const textSoft = dark ? "rgba(255,255,255,0.80)" : "rgba(13,13,13,0.68)";
+  const textDim  = dark ? "rgba(255,255,255,0.45)" : "rgba(13,13,13,0.40)";
+  const accent   = brand.palette[2] ?? brand.palette[1] ?? textFull;
+
+  // Very subtle uniform overlay — just enough to ensure text legibility if
+  // the generated image is slightly off the expected near-solid background.
+  const overlayColor   = dark ? "#000000" : "#ffffff";
+  const overlayOpacity = "0.12";
+  const letterSpacing  = isSerif ? "0" : "-0.5";
 
   const overlay = `
     <svg width="${FULL_W}" height="${FULL_H}" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <linearGradient id="scrim" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="28%" stop-color="#000000" stop-opacity="0"/>
-          <stop offset="52%" stop-color="#000000" stop-opacity="0.68"/>
-          <stop offset="100%" stop-color="#000000" stop-opacity="0.88"/>
-        </linearGradient>
-      </defs>
-      <rect width="${FULL_W}" height="${FULL_H}" fill="url(#scrim)"/>
+      <rect width="${FULL_W}" height="${FULL_H}" fill="${overlayColor}" fill-opacity="${overlayOpacity}"/>
       <text font-family="${fontStack}" font-size="${headline.fontSize}" font-weight="700"
-            fill="#ffffff" letter-spacing="${letterSpacing}">${tspans(headline)}</text>
+            fill="${textFull}" letter-spacing="${letterSpacing}">${tspans(headline)}</text>
       <text font-family="${fontStack}" font-size="${personal.fontSize}"
-            fill="#ffffff" fill-opacity="0.92">${tspans(personal)}</text>
+            fill="${textSoft}">${tspans(personal)}</text>
       <text font-family="${fontStack}" font-size="${body.fontSize}"
-            fill="#ffffff" fill-opacity="0.82">${tspans(body)}</text>
-      <text font-family="${fontStack}" font-size="${signOff.fontSize}" font-style="italic"
-            fill="#ffffff" fill-opacity="0.68">${tspans(signOff)}</text>
-      <text font-family="${fontStack}" font-size="${cta.fontSize}" font-weight="700"
+            fill="${textSoft}">${tspans(body)}</text>
+      <text font-family="${fontStack}" font-size="${cta.fontSize}" font-weight="600"
             fill="${accent}">${tspans(cta)}</text>
-      <text font-family="${fontStack}" font-size="${link.fontSize}"
-            fill="#ffffff" fill-opacity="0.58">${tspans(link)}</text>
+      <text font-family="${fontStack}" font-size="${signOff.fontSize}" font-style="italic"
+            fill="${textDim}">${tspans(signOff)}</text>
+      <text font-family="${fontStack}" font-size="${label.fontSize}"
+            fill="${textDim}">${tspans(label)}</text>
     </svg>`;
 
-  const logoBuf =
-    (await fetchImagePng(brand.logo_url)) ??
-    (await wordmarkPng(company, brand.palette[2] ?? "#c9a23f", "#ffffffdd"));
-  const logoSized = await sharp(logoBuf).resize(280, 100, { fit: "inside" }).png().toBuffer();
-  const qrSized   = await sharp(qrPng).resize(qr.w, qr.h, { fit: "fill" }).png().toBuffer();
+  const qrSized = await sharp(qrPng).resize(qr.w, qr.h, { fit: "fill" }).png().toBuffer();
 
   return sharp(base)
     .composite([
       { input: Buffer.from(overlay), top: 0, left: 0 },
-      { input: logoSized, top: SAFE, left: SAFE },
       { input: qrSized, top: qr.y, left: qr.x },
     ])
     .png()
     .toBuffer();
 }
 
-async function buildBack(brand: BrandKit, company: string): Promise<Buffer> {
-  // Clean brand graphic — Lob prints the address and postage indicia over this.
-  // No text from us; the entire canvas is available for Lob's use.
-  const bg = brand.palette[0] ?? "#0b3d2e";
-  const fg = brand.palette[1] ?? "#f2e9dc";
+async function buildBack(brand: BrandKit): Promise<Buffer> {
+  // Clean solid brand color — Lob prints address + postage indicia over this.
+  // Minimal, no text, no decoration. Same color logic as front text: dark brand
+  // color on a light card or light on dark, whichever the palette dictates.
+  const bg  = brand.palette[0] ?? "#1a1a2e";
+  const fg  = brand.palette[1] ?? "#f0f0f0";
 
+  // Very subtle vignette toward the edges using the secondary palette color.
   const svg = `
     <svg width="${FULL_W}" height="${FULL_H}" xmlns="http://www.w3.org/2000/svg">
       <defs>
-        <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+        <radialGradient id="vignette" cx="50%" cy="50%" r="70%">
           <stop offset="0%" stop-color="${bg}"/>
-          <stop offset="100%" stop-color="${fg}" stop-opacity="0.55"/>
-        </linearGradient>
+          <stop offset="100%" stop-color="${fg}" stop-opacity="0.18"/>
+        </radialGradient>
       </defs>
-      <rect width="${FULL_W}" height="${FULL_H}" fill="url(#bg)"/>
+      <rect width="${FULL_W}" height="${FULL_H}" fill="${bg}"/>
+      <rect width="${FULL_W}" height="${FULL_H}" fill="url(#vignette)"/>
     </svg>`;
 
-  const logoBuf =
-    (await fetchImagePng(brand.logo_url)) ??
-    (await wordmarkPng(company, fg, "transparent"));
-  const sized = await sharp(logoBuf).resize(420, 160, { fit: "inside" }).png().toBuffer();
-
-  return sharp(Buffer.from(svg))
-    .composite([{ input: sized, gravity: "center" }])
-    .png()
-    .toBuffer();
+  return sharp(Buffer.from(svg)).png().toBuffer();
 }
 
 async function buildPdf(frontPng: Buffer, backPng: Buffer): Promise<Buffer> {
@@ -426,7 +434,6 @@ export async function compose(
   copy: Copy,
   brand: BrandKit,
   bookingUrl: string,
-  company: string,
 ): Promise<ComposedCard> {
   // Real QR library — never let the image model draw it. High error correction
   // so it survives print; the QR encodes the tracked redirect (/r/:trackingId).
@@ -439,8 +446,8 @@ export async function compose(
 
   const { stack: fontStack, isSerif } = resolveFontStack(brand.fonts ?? []);
   const layout   = planLayout(copy, bookingUrl);
-  const frontPng = await buildFront(imagePng, brand, company, layout, qrPng, fontStack, isSerif);
-  const backPng  = await buildBack(brand, company);
+  const frontPng = await buildFront(imagePng, brand, layout, qrPng, fontStack, isSerif);
+  const backPng  = await buildBack(brand);
   const pdf      = await buildPdf(frontPng, backPng);
 
   return { frontPng, backPng, qrPng, pdf, layout };

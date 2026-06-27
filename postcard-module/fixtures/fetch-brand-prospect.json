@@ -27,6 +27,12 @@
       "published_date": "2026-06-10"
     }
   ],
+  "brand_kit": {
+    "logo_url": null,
+    "palette": ["#0a2540", "#f6f9fc", "#635bff"],
+    "fonts": ["Helvetica Neue", "Helvetica", "Arial", "sans-serif"],
+    "source": "fallback"
+  },
   "tracking_id": "trk_demo_stripe_fetch_001",
   "booking_url": "https://example.com/r/trk_demo_stripe_fetch_001",
   "attio_record_id": "rec_demo_stripe_fetch_001"
