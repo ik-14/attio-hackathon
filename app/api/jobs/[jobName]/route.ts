@@ -21,7 +21,7 @@ export function OPTIONS() {
 }
 
 export async function POST(
-  _request: Request,
+  request: Request,
   ctx: { params: Promise<{ jobName: string }> }
 ) {
   const { jobName } = await ctx.params;
@@ -33,8 +33,18 @@ export async function POST(
     );
   }
 
+  // Optional { leadId } scopes enrich/outreach to a single lead (per-row demo control).
+  let leadId: string | undefined;
   try {
-    const result = await JOBS[jobName as JobName]();
+    const body = await request.json();
+    if (body && typeof body.leadId === "string") leadId = body.leadId;
+  } catch {
+    /* no body — run for all */
+  }
+
+  try {
+    const run = JOBS[jobName as JobName] as (id?: string) => Promise<unknown>;
+    const result = await run(leadId);
     return json({ ok: true, job: jobName, result });
   } catch (err) {
     console.error(`[job/${jobName}] error:`, err);

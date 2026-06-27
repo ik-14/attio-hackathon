@@ -105,6 +105,20 @@ export default function DashboardScreen({ initialLeads }: Props) {
     []
   );
 
+  const handleRunLeadJob = useCallback(
+    async (job: "enrich" | "outreach", lead: Lead) => {
+      setIsRunning(true);
+      await triggerJob(job, lead.attioRecordId);
+      toast(
+        job === "enrich"
+          ? `Enriching ${lead.name}…`
+          : `Reaching out to ${lead.name} — email + postcard`
+      );
+      setIsRunning(false);
+    },
+    []
+  );
+
   return (
     <div
       className="strike-animate-fade-up"
@@ -141,7 +155,7 @@ export default function DashboardScreen({ initialLeads }: Props) {
           <div
             style={{ fontWeight: 800, fontSize: 17, color: "var(--strike-text)" }}
           >
-            Strike
+            Reachd
           </div>
         </div>
 
@@ -251,7 +265,7 @@ export default function DashboardScreen({ initialLeads }: Props) {
                 display: "inline-block",
               }}
             />
-            Strike · agent running
+            Reachd · agent running
           </div>
         </div>
       </aside>
@@ -447,6 +461,8 @@ export default function DashboardScreen({ initialLeads }: Props) {
                   key={lead.attioRecordId}
                   lead={lead}
                   onClick={() => handleLeadClick(lead)}
+                  onRunJob={handleRunLeadJob}
+                  busy={isRunning}
                   animationDelay={i * 80}
                 />
               ))}

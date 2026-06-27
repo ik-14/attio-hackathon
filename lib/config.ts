@@ -32,7 +32,7 @@ export const config = {
   imageFallbackModel: env("GEMINI_IMAGE_FALLBACK_MODEL", "gemini-3.1-flash-image"),
 
   lobFrom: {
-    name: env("LOB_FROM_NAME", "Strike HQ"),
+    name: env("LOB_FROM_NAME", "Reachd HQ"),
     line1: env("LOB_FROM_ADDRESS_LINE1", "760 Market St Ste 900"),
     city: env("LOB_FROM_CITY", "San Francisco"),
     state: env("LOB_FROM_STATE", "CA"),

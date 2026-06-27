@@ -11,8 +11,12 @@ export interface EnrichSummary {
   leads: Pick<Lead, "name" | "company" | "enrichmentSignal">[];
 }
 
-export async function runEnrich(): Promise<EnrichSummary> {
-  const leads = await store.listByStage("discovered");
+export async function runEnrich(leadId?: string): Promise<EnrichSummary> {
+  const leads = leadId
+    ? [await store.getLead(leadId)].filter(
+        (l): l is Lead => !!l && l.sequenceStage === "discovered"
+      )
+    : await store.listByStage("discovered");
   const summary: EnrichSummary = { enriched: 0, leads: [] };
 
   for (const lead of leads) {

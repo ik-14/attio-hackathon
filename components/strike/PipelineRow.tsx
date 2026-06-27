@@ -21,12 +21,20 @@ function avatarGradient(lead: Lead): string {
 interface PipelineRowProps {
   lead: Lead;
   onClick: () => void;
+  onRunJob?: (job: "enrich" | "outreach", lead: Lead) => void;
+  busy?: boolean;
   animationDelay?: number;
 }
 
-export function PipelineRow({ lead, onClick, animationDelay = 0 }: PipelineRowProps) {
+export function PipelineRow({ lead, onClick, onRunJob, busy = false, animationDelay = 0 }: PipelineRowProps) {
   const isBooked = lead.dealStage === "Meeting Booked";
   const isReview = lead.sequenceStage === "needs_review";
+  const rowAction =
+    lead.sequenceStage === "discovered"
+      ? ({ job: "enrich", label: "Enrich" } as const)
+      : lead.sequenceStage === "enriched"
+        ? ({ job: "outreach", label: "Reach out" } as const)
+        : null;
 
   let rowBg = "var(--strike-surface)";
   let rowBorder = "var(--strike-border)";
@@ -135,11 +143,36 @@ export function PipelineRow({ lead, onClick, animationDelay = 0 }: PipelineRowPr
             Review
           </span>
         )}
-        {!isBooked && !isReview && (
-          <span style={{ fontSize: 11.5, color: "var(--strike-text-faint)" }}>
-            {lead.dealStage ?? lead.sequenceStage}
-          </span>
-        )}
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          {!isBooked && !isReview && (
+            <span style={{ fontSize: 11.5, color: "var(--strike-text-faint)" }}>
+              {lead.dealStage ?? lead.sequenceStage}
+            </span>
+          )}
+          {rowAction && onRunJob && (
+            <button
+              disabled={busy}
+              onClick={(e) => {
+                e.stopPropagation();
+                onRunJob(rowAction.job, lead);
+              }}
+              style={{
+                background: rowAction.job === "outreach" ? "var(--strike-primary)" : "var(--strike-teal)",
+                color: "#fff",
+                border: "none",
+                fontSize: 11.5,
+                fontWeight: 700,
+                padding: "6px 13px",
+                borderRadius: 100,
+                cursor: busy ? "not-allowed" : "pointer",
+                opacity: busy ? 0.5 : 1,
+                whiteSpace: "nowrap",
+              }}
+            >
+              {rowAction.label} →
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Stepper */}

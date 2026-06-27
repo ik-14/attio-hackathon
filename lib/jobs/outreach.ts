@@ -15,8 +15,12 @@ export interface OutreachSummary {
   leads: Pick<Lead, "name" | "company" | "trackingId" | "postcardProofUrl">[];
 }
 
-export async function runOutreach(): Promise<OutreachSummary> {
-  const leads = await store.listByStage("enriched");
+export async function runOutreach(leadId?: string): Promise<OutreachSummary> {
+  const leads = leadId
+    ? [await store.getLead(leadId)].filter(
+        (l): l is Lead => !!l && l.sequenceStage === "enriched"
+      )
+    : await store.listByStage("enriched");
   const currentIcp = getIcp();
   const summary: OutreachSummary = { sent: 0, leads: [] };
 

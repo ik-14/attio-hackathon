@@ -1,5 +1,5 @@
 /**
- * Strike API client — always tries the real /api/* endpoints first,
+ * Reachd API client — always tries the real /api/* endpoints first,
  * falls back to fixture data on network error or non-2xx response.
  */
 import type { Icp, Lead, PipelineStatus } from "./types";
@@ -28,7 +28,7 @@ export async function getIcp(): Promise<Icp> {
   try {
     return await apiFetch<Icp>(`${BASE}/api/icp`);
   } catch (err) {
-    console.warn("[Strike] getIcp: API unavailable, using fixture.", err);
+    console.warn("[Reachd] getIcp: API unavailable, using fixture.", err);
     return FIXTURE_ICP;
   }
 }
@@ -43,7 +43,7 @@ export async function chatIcp(
       body: JSON.stringify({ message }),
     });
   } catch (err) {
-    console.warn("[Strike] chatIcp: API unavailable, using fixture.", err);
+    console.warn("[Reachd] chatIcp: API unavailable, using fixture.", err);
     return FIXTURE_ICP_REPLY;
   }
 }
@@ -54,7 +54,7 @@ export async function getStatus(): Promise<PipelineStatus> {
   try {
     return await apiFetch<PipelineStatus>(`${BASE}/api/status`);
   } catch (err) {
-    console.warn("[Strike] getStatus: API unavailable, using fixture.", err);
+    console.warn("[Reachd] getStatus: API unavailable, using fixture.", err);
     return { ...FIXTURE_STATUS, updatedAt: new Date().toISOString() };
   }
 }
@@ -66,7 +66,7 @@ export async function getLeads(stage?: string): Promise<Lead[]> {
       : `${BASE}/api/leads`;
     return await apiFetch<Lead[]>(url);
   } catch (err) {
-    console.warn("[Strike] getLeads: API unavailable, using fixture.", err);
+    console.warn("[Reachd] getLeads: API unavailable, using fixture.", err);
     return FIXTURE_STATUS.leads;
   }
 }
@@ -74,15 +74,20 @@ export async function getLeads(stage?: string): Promise<Lead[]> {
 // ── Jobs ─────────────────────────────────────────────────────────────────────
 
 export async function triggerJob(
-  name: "discover" | "enrich" | "outreach" | "stale-check"
+  name: "discover" | "enrich" | "outreach" | "stale-check",
+  leadId?: string
 ): Promise<{ ok: boolean; job?: unknown }> {
   try {
     return await apiFetch<{ ok: boolean; job?: unknown }>(
       `${BASE}/api/jobs/${name}`,
-      { method: "POST" }
+      {
+        method: "POST",
+        headers: leadId ? { "content-type": "application/json" } : undefined,
+        body: leadId ? JSON.stringify({ leadId }) : undefined,
+      }
     );
   } catch (err) {
-    console.warn(`[Strike] triggerJob(${name}): API unavailable.`, err);
+    console.warn(`[Reachd] triggerJob(${name}): API unavailable.`, err);
     return { ok: false };
   }
 }
@@ -98,7 +103,7 @@ export async function approvePostcard(
       { method: "POST" }
     );
   } catch (err) {
-    console.warn("[Strike] approvePostcard: API unavailable.", err);
+    console.warn("[Reachd] approvePostcard: API unavailable.", err);
     return { ok: false };
   }
 }
@@ -116,7 +121,7 @@ export async function regenPostcard(
       }
     );
   } catch (err) {
-    console.warn("[Strike] regenPostcard: API unavailable.", err);
+    console.warn("[Reachd] regenPostcard: API unavailable.", err);
     return { ok: false };
   }
 }
