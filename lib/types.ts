@@ -2,6 +2,15 @@
 // (BACKEND-PLAN §3). Additive-only: never rename a field without updating both
 // the API routes (app/api/*) and the UI (app/*, components/*).
 
+export interface PostalAddress {
+  line1: string;
+  line2?: string;
+  city: string;
+  state?: string;
+  postcode: string;
+  country: string;
+}
+
 export type SequenceStage =
   | "discovered"
   | "enriched"
@@ -37,6 +46,10 @@ export interface Lead {
   mailStatus?: MailStatus;
   postcardProofUrl?: string; // Lob proof PDF, for FE to display
   lastTouchAt: string | null;
+  title?: string;
+  companyDomain?: string;
+  industry?: string;
+  postalAddress?: PostalAddress;
 }
 
 export interface PipelineStatus {

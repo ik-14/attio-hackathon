@@ -28,6 +28,18 @@ export const config = {
 
   mailWaitDays: Number(env("MAIL_WAIT_DAYS", "0")),
 
+  imageModel: env("GEMINI_IMAGE_MODEL", "gemini-3-pro-image"),
+  imageFallbackModel: env("GEMINI_IMAGE_FALLBACK_MODEL", "gemini-3.1-flash-image"),
+
+  lobFrom: {
+    name: env("LOB_FROM_NAME", "Strike HQ"),
+    line1: env("LOB_FROM_ADDRESS_LINE1", "760 Market St Ste 900"),
+    city: env("LOB_FROM_CITY", "San Francisco"),
+    state: env("LOB_FROM_STATE", "CA"),
+    zip: env("LOB_FROM_ZIP", "94102"),
+    country: env("LOB_FROM_COUNTRY", "US"),
+  },
+
   defaultIcp: {
     titles: csv("ICP_TITLES", ["VP Sales", "Head of Sales", "RevOps"]),
     industries: csv("ICP_INDUSTRIES", ["software", "fintech"]),

@@ -1,13 +1,13 @@
-// Job: outreach — for each enriched lead, fire email + postcard TOGETHER
-// (no wait gate between them). Both use the same trackingId.
+// Job: outreach — for each enriched lead, fire email + postcard IN PARALLEL.
+// Both use the same trackingId. The postcard is best-effort: a failure cannot
+// break the email half or the stage update.
 
-import { config } from "@/lib/config";
 import { getIcp } from "@/lib/icpStore";
-import { SEED_LEADS } from "@/lib/seed";
 import * as store from "@/lib/store";
 import * as gemini from "@/lib/clients/geminiClient";
 import * as resend from "@/lib/clients/resendClient";
-import * as lob from "@/lib/clients/lobClient";
+import { runPostcard } from "@/lib/postcard/run";
+import { leadToMailInput } from "@/lib/postcard/adapter";
 import type { Lead } from "@/lib/types";
 
 export interface OutreachSummary {
@@ -17,18 +17,12 @@ export interface OutreachSummary {
 
 export async function runOutreach(): Promise<OutreachSummary> {
   const leads = await store.listByStage("enriched");
-  const icp = getIcp();
+  const currentIcp = getIcp();
   const summary: OutreachSummary = { sent: 0, leads: [] };
 
   await Promise.all(
     leads.map(async (lead) => {
       const signal = lead.enrichmentSignal ?? `${lead.company} is growing fast`;
-
-      // Generate image prompt + image (cached by trackingId)
-      const imgBrief = { company: lead.company, industry: icp.industries[0] ?? "software" };
-      const { prompt: imgPrompt } = await gemini.imagePrompt(imgBrief);
-      await gemini.generateImage(imgPrompt, lead.trackingId);
-      const imageUrl = `${config.baseUrl}/api/assets/${lead.trackingId}`;
 
       // Run email and postcard in parallel
       const [emailResult, postcardResult] = await Promise.allSettled([
@@ -42,57 +36,52 @@ export async function runOutreach(): Promise<OutreachSummary> {
             name: lead.name,
             company: lead.company,
             signal,
-            icp,
+            icp: currentIcp,
           });
           const result = await resend.sendEmail({ to: lead.email, subject, html });
           console.log(`[outreach] email sent to ${lead.email} id=${result.id}`);
           return result;
         })(),
 
-        // (b) Postcard
+        // (b) Postcard — best-effort; failure must not break email or stage update
         (async () => {
-          const { personalLine, body, cta } = await gemini.writePostcardCopy({
-            name: lead.name,
-            company: lead.company,
-            signal,
-          });
-
-          // Find seed address if available
-          const seedRecord = SEED_LEADS.find((s) => s.name === lead.name);
-          const toAddress: lob.PostcardAddress = seedRecord?.address ?? {
-            name: lead.name,
-            address_line1: "123 Market St",
-            address_city: "San Francisco",
-            address_state: "CA",
-            address_zip: "94105",
-            address_country: "US",
-          };
-
-          const { proofUrl } = await lob.sendPostcard({
-            to: toAddress,
-            trackingId: lead.trackingId,
-            personalLine,
-            body,
-            cta,
-            imageUrl,
-          });
-          console.log(`[outreach] postcard sent for ${lead.name} proof=${proofUrl}`);
-          return { proofUrl };
+          try {
+            const mailInput = leadToMailInput(lead, currentIcp);
+            const result = await runPostcard(mailInput);
+            console.log(`[outreach] postcard ${lead.name} status=${result.mailStatus} proofUrl=${result.proofUrl ?? "none"}`);
+            return result;
+          } catch (err) {
+            console.warn(`[outreach] postcard failed for ${lead.name}:`, (err as Error).message);
+            throw err;
+          }
         })(),
       ]);
 
-      const proofUrl =
-        postcardResult.status === "fulfilled" ? postcardResult.value.proofUrl : undefined;
+      // Determine stage from postcard result
+      let nextStage: "outreach_sent" | "needs_review" = "outreach_sent";
+      let proofUrl: string | undefined;
+      let noteExtra = "";
+
+      if (postcardResult.status === "fulfilled") {
+        const pc = postcardResult.value;
+        proofUrl = pc.proofUrl;
+        if (pc.mailStatus === "needs_human") {
+          nextStage = "needs_review";
+          noteExtra = " Postcard held for human — failed pre-send check.";
+        }
+      } else {
+        console.warn(`[outreach] postcard error for ${lead.name} — continuing with outreach_sent`);
+      }
 
       await store.updateLead(lead.attioRecordId, {
-        sequenceStage: "outreach_sent",
-        dealStage: "Contacted",
-        mailStatus: "sent",
+        sequenceStage: nextStage,
+        dealStage: nextStage === "outreach_sent" ? "Contacted" : "Needs Review",
+        mailStatus: postcardResult.status === "fulfilled" ? postcardResult.value.mailStatus : "needs_human",
         postcardProofUrl: proofUrl,
       });
       await store.addNote(
         lead.attioRecordId,
-        `Outreach dispatched — email ${emailResult.status === "fulfilled" ? "sent" : "failed"}; postcard proof: ${proofUrl ?? "pending"}`
+        `Outreach dispatched — email ${emailResult.status === "fulfilled" ? "sent" : "failed"}; postcard proof: ${proofUrl ?? "pending"}.${noteExtra}`
       );
 
       summary.sent++;
