@@ -1,350 +1,214 @@
 # Reachd — Autonomous Sales Outreach Agent
 
-Reachd is an AI agent that discovers leads, researches them, then sends a personalised email and a bespoke physical postcard in one shot — fully autonomously. When the prospect scans the QR code or books a meeting, Reachd writes the engagement back to Attio and closes the loop.
+Reachd discovers leads, researches them, and reaches out on **two channels at once** — a personalised email and a bespoke physical postcard with a scannable QR — fully autonomously. When the prospect scans the QR or books a meeting, Reachd writes the engagement back to Attio and closes the loop. No human in the loop after you set the target.
 
 Built for the Attio Hackathon 2026.
+
+**One app, one deploy.** The backend (API routes) and frontend (dashboard) are a single Next.js app that ships to Vercel as one unit. Attio is the only database.
 
 ---
 
 ## What it does
 
 ```
-User types their ICP once ("VP Sales at fintech, 50-500 people")
+User types their ICP once ("VP Sales at fintech, 50–500 people")
          │
          ▼
-1. Discover    Score Apollo candidates against the ICP using Gemini          → person + deal created in Attio
-2. Enrich      Tavily web search finds a "why now" signal per company        → enrichmentSignal written to Attio
-3. Outreach    Gemini writes personalised email + postcard copy simultaneously → both dispatched in one step
-               ├── Email  → Resend
-               └── Postcard → 6-stage generation pipeline → Lob (physical mail)
-4. Engage      Prospect scans QR / books Calendly / webhook fires            → sequence_stage = engaged in Attio
-5. Stale-check Flags leads idle too long for human review                    → needs_review in Attio
+1. Discover    Gemini scores each seed lead against the ICP            → person + deal created in Attio
+2. Enrich      Tavily finds a "why now" signal; Gemini distils it      → enrichmentSignal written to Attio
+3. Outreach    Email + postcard generated and dispatched together      → both fire in one step
+               ├── Email     → Gemini copy → Resend
+               └── Postcard  → 6-stage generation pipeline → Lob (physical mail, test mode)
+4. Engage      Prospect scans QR / books Calendly / webhook fires      → sequence_stage = engaged in Attio
+5. Stale-check Flags leads idle too long for human review              → needs_review in Attio
 ```
 
-Everything is written back to Attio. No separate database. The agent runs autonomously — the user never touches a terminal after initial setup.
+Everything is written back to Attio. The agent runs autonomously — the user only ever types their ICP.
 
 ---
 
 ## Quick start
 
-### Main app (Next.js)
-
 ```bash
 # Requires: Node 20+, npm
-git checkout ali/noref/backend
 npm install
 
-cp .env.local.example .env.local   # fill in keys (see table below)
-npm run dev                         # http://localhost:3000
+cp .env.example .env.local     # fill in keys (see table below) — or leave blank to run in stub mode
+npm run dev                     # http://localhost:3000
+```
 
-# (Optional) create Attio custom attributes automatically:
+Open [http://localhost:3000](http://localhost:3000).
+
+The app runs with **zero API keys** — every external client falls back to a deterministic stub, so the full flow (ICP chat → loading → dashboard → pipeline) works locally with no credentials. Drop real keys into `.env.local` and the same code paths go live.
+
+```bash
+# (Optional) create the required Attio custom attributes automatically:
 node scripts/attio-setup.mjs
 ```
 
-Open [http://localhost:3000](http://localhost:3000). The app works with **zero API keys** — every client falls back to deterministic stubs so the full UI flow (ICP chat → loading → dashboard with leads and stepper) runs locally with no credentials.
+---
 
-### Postcard module (standalone test)
+## Environment variables (`.env.local`)
 
-```bash
-git checkout yewen
-cd postcard-module
-npm install
+| Variable | Required | What it does | Without it |
+|---|---|---|---|
+| `ATTIO_API_KEY` | Recommended | Read/write people, notes (and deals if enabled) in Attio | Store is in-memory only; Attio writes are skipped |
+| `GEMINI_API_KEY` | Recommended | ICP parsing, lead scoring, email + postcard copy, image generation, fact extraction | Deterministic stubs return plausible fake data |
+| `TAVILY_API_KEY` | Optional | Live web search for enrichment signals | Stub returns a canned signal |
+| `RESEND_API_KEY` | Optional | Send outreach emails | Stub logs the email, returns a fake id |
+| `LOB_API_KEY` | Optional | Send physical postcards (`test_` prefix = sandbox proof, nothing mailed) | Stub returns a mock proof id |
+| `APOLLO_API_KEY` | Optional | Org enrichment endpoint (free tier) | Skipped |
+| `BOOKING_PAGE_URL` | Optional | Calendly URL encoded into the tracked QR/link | `https://calendly.com/kiki-zhang058/30min` |
+| `BASE_URL` | Optional | Public host for tracking links | `http://localhost:3000` |
+| `CALENDLY_WEBHOOK_SIGNING_KEY` | Optional | Validate Calendly booking webhooks (HMAC-SHA256) | Webhook accepted without signature check |
+| `GEMINI_IMAGE_MODEL` | Optional | Postcard hero image model | `gemini-3-pro-image` |
+| `GEMINI_IMAGE_FALLBACK_MODEL` | Optional | Fallback image model on 5xx | `gemini-3.1-flash-image` |
+| `LOB_FROM_*` | Optional | Return address on the postcard | US defaults in `lib/config.ts` |
+| `MAIL_WAIT_DAYS` | Optional | Idle days before stale-check flags a lead | `0` (fires immediately, for demos) |
+| `ICP_TITLES` · `ICP_INDUSTRIES` · `ICP_HEADCOUNT_MIN/MAX` | Optional | Default ICP shown before the user chats | sensible defaults |
 
-cp .env.example .env   # fill in keys
-npm run demo           # generates out/trk_demo_northwind_001/postcard.pdf
+---
 
-# Force a fresh Gemini image (skips disk cache):
-rm out/cache/trk_demo_northwind_001.png && npm run demo
+## Architecture
 
-# Test the needs_human gate (lead with no hook):
-npm run demo -- fixtures/no-hook.json
+```
+attio-hackathon/                  single Next.js app → one Vercel deploy
+├─ app/
+│  ├─ page.tsx                     3-phase UI: ICP chat → radar loading → dashboard
+│  ├─ _components/                 IcpChatScreen · LoadingScreen · DashboardScreen
+│  └─ api/                         the backend (route handlers)
+│     ├─ icp · icp/chat            GET current ICP · POST natural-language ICP → Gemini parse
+│     ├─ status · leads            dashboard polling (counts + leads)
+│     ├─ jobs/[jobName]            POST discover | enrich | outreach | stale-check (optional { leadId })
+│     ├─ r/[trackingId]            QR/link redirect → mark engaged → Calendly
+│     ├─ webhooks/calendly         invitee.created → Meeting Booked
+│     └─ assets/[id]               serves the composed postcard front PNG (for the dashboard preview)
+├─ lib/
+│  ├─ config.ts · types.ts         config + key gating · shared FE↔BE contract
+│  ├─ store.ts                     lead store: in-memory primary, best-effort Attio side-effects
+│  ├─ clients/                     attio · gemini · tavily · resend · lob · apollo (each: live or stub)
+│  ├─ jobs/                        discover · enrich · outreach · staleCheck
+│  └─ postcard/                    the integrated 6-stage postcard pipeline (see below)
+├─ components/strike/              dashboard UI (LeadCard, PipelineRow, Stepper, …)
+└─ scripts/attio-setup.mjs         idempotent Attio attribute setup
 ```
 
----
-
-## Environment variables
-
-### Main app — `.env.local`
-
-| Variable | Required | What it does | Without it |
-|---|---|---|---|
-| `ATTIO_API_KEY` | Recommended | Read/write people, deals, notes in Attio | Stubs log Attio calls; store is in-memory only |
-| `GEMINI_API_KEY` | Recommended | ICP parsing, lead scoring, email/postcard copy, image generation | Deterministic stubs return plausible fake data |
-| `TAVILY_API_KEY` | Optional | Live web search for enrichment signals | Stub returns canned signal string |
-| `RESEND_API_KEY` | Optional | Send outreach emails | Stub logs email, returns fake ID |
-| `LOB_API_KEY` | Optional | Send physical postcards (use `test_` prefix for sandbox) | Stub logs postcard, returns fake proof URL |
-| `APOLLO_API_KEY` | Optional | Org enrichment endpoint (free tier) | Stub returns null |
-| `BOOKING_PAGE_URL` | Optional | Calendly URL encoded into tracked links | Defaults to `https://calendly.com/kiki-zhang058/30min` |
-| `BASE_URL` | Optional | Public host for tracking links and image URLs | Defaults to `http://localhost:3000` |
-| `CALENDLY_WEBHOOK_SIGNING_KEY` | Optional | Validate Calendly booking webhooks | Webhooks accepted without signature check |
-
-### Postcard module — `postcard-module/.env`
-
-| Variable | Required | What it does | Without it |
-|---|---|---|---|
-| `GEMINI_API_KEY` | Recommended | Text stages 1/2/3a + image stage 3b | Deterministic mock text + branded gradient image |
-| `GEMINI_TEXT_MODEL` | Optional | Text model override | `gemini-2.5-flash` |
-| `GEMINI_IMAGE_MODEL` | Optional | Image model | `gemini-2.0-flash-preview-image-generation` |
-| `LOB_API_KEY` | Optional | Send to Lob (use `test_` prefix for sandbox) | PDF saved locally, not submitted |
-| `ATTIO_API_KEY` | Optional | Write `mail_status` + activity note to Attio | Logs only |
-| `TEXT_LLM_PROVIDER` | Optional | `gemini` or `mock` | `gemini` |
-| `OUT_DIR` | Optional | Where PDFs and image cache are saved | `./out` |
+The clean QR URL `/r/:trackingId` is rewritten to `/api/r/:trackingId` (see `next.config.ts`). Routes that use Buffers/sharp/crypto are pinned to `runtime = "nodejs"`.
 
 ---
 
-## APIs and services used
+## APIs and services
 
-### Attio (REST v2)
+### Attio (REST v2) — the single source of truth
 
-The single source of truth. No separate database.
+| Operation | Endpoint |
+|---|---|
+| Create person | `POST /v2/objects/people/records` |
+| Update stage | `PATCH /v2/objects/people/records/:id` |
+| Query by stage / tracking_id | `POST /v2/objects/people/records/query` |
+| Add activity note | `POST /v2/notes` |
+| Create / link / advance deal | `POST` / `PUT` / `PATCH /v2/objects/deals/records…` (best-effort; skipped if Deals isn't enabled) |
 
-| Operation | Endpoint | What we send | What we get |
-|---|---|---|---|
-| Create person | `POST /v2/objects/people/records` | name, email, source, icp_match_score, tracking_id, sequence_stage | `record_id` UUID |
-| Update stage | `PATCH /v2/objects/people/records/:id` | sequence_stage, last_touch_at (or mail_status) | 200 OK |
-| Query by stage | `POST /v2/objects/people/records/query` | filter on sequence_stage attribute | Array of person records |
-| Add note | `POST /v2/notes` | parent_object=people, parent_record_id, content | Note object |
-| Create deal | `POST /v2/objects/deals/records` | name, stage | `record_id` UUID |
-| Link person → deal | `PUT /v2/objects/deals/records/:id/associations/people` | person record_id | 200 OK |
-| Update deal stage | `PATCH /v2/objects/deals/records/:id` | stage status | 200 OK |
+**Custom attributes required on the Person object** — all **text**, except `icp_match_score` (number):
 
-**Custom attributes required on the Attio Person object** (all text, except `icp_match_score` which is number):
+| Slug | Type | Values |
+|---|---|---|
+| `sequence_stage` | Text | `discovered` · `enriched` · `outreach_sent` · `engaged` · `needs_review` |
+| `mail_status` | Text | `ready_to_send` · `sent` · `needs_human` |
+| `source` | Text (select) | `seed` · `apollo` · `attio_lookalike` |
+| `icp_match_score` | Number | 0–100 |
+| `tracking_id` | Text | UUID minted at discovery, encoded into the QR |
+| `last_touch_at` | Text | ISO-8601 timestamp |
 
-`sequence_stage` · `mail_status` · `source` · `icp_match_score` · `tracking_id` · `last_touch_at`
-
-Run `node scripts/attio-setup.mjs` to create them automatically, or add them manually in Attio Settings → Objects → People → Attributes.
-
----
+Run `node scripts/attio-setup.mjs` to create them, or add them in Attio Settings → Objects → People → Attributes. The store always writes via the in-memory layer first, so a missing attribute or disabled Deals object never breaks the pipeline — the Attio write just logs and continues.
 
 ### Google Gemini (`@google/genai`)
 
-Used for six distinct tasks. All JSON outputs use `responseMimeType: "application/json"` with explicit `responseSchema` to prevent hallucinated wrapper keys.
+JSON tasks use structured output (`responseMimeType: application/json` + schema). Retries on 429/500/503 with backoff.
 
-| Task | Model | Input | Output schema |
-|---|---|---|---|
-| Parse ICP from natural language | `gemini-2.5-flash` | Free-text ICP description | `{titles[], industries[], headcount[min,max]}` |
-| Score lead against ICP | `gemini-2.5-flash` | Lead details + ICP criteria | `{score: 0-100, reason: string}` |
-| Write email copy | `gemini-2.5-flash` | Lead name, company, enrichment signal, ICP | `{subject, html}` |
-| Write postcard copy | `gemini-2.5-flash` | Lead name, company, signal | `{personalLine, body, cta}` |
-| Art-direct image prompt | `gemini-2.5-flash` | Brand cues, sector, tone | `{image_prompt, negative_prompt, aspect_ratio}` |
-| Generate postcard front image | `gemini-2.0-flash-preview-image-generation` | Art-directed text prompt | Base64-encoded PNG |
-| Extract enrichment facts | `gemini-2.5-flash` | Raw Tavily search snippets | `{signal: string}` |
+| Task | Model | Output |
+|---|---|---|
+| Parse ICP from natural language | `gemini-2.5-flash` | `{titles[], industries[], headcount[min,max]}` |
+| Score lead vs ICP | `gemini-2.5-flash` | `{score 0-100, reason}` |
+| Email copy | `gemini-2.5-flash` | `{subject, html}` |
+| Postcard copy | `gemini-2.5-flash` | `{headline, personal_line, body, cta, sign_off}` |
+| Image art-direction | `gemini-2.5-flash` | `{image_prompt, negative_prompt, aspect_ratio}` |
+| Postcard hero image | `gemini-3-pro-image` → `gemini-3.1-flash-image` (fallback) | PNG (raw `generateContent`, `responseModalities:["IMAGE"]`) |
+| Extract enrichment fact | `gemini-2.5-flash` | `{signal}` |
 
-Images are cached to disk at `postcard-module/out/cache/<trackingId>.png` on first generation. Subsequent runs serve from cache — always pre-generate before the demo.
-
----
+The hero image is cached to `os.tmpdir()/strike-postcard-cache/<trackingId>.png` on first generation and served from cache thereafter — pre-generate before a live demo. If both image models fail it falls back to an on-brand gradient placeholder so compose always completes.
 
 ### Tavily (`@tavily/core`)
 
-Used in the Enrich job to find a "why now" signal for each prospect company.
-
-| | |
-|---|---|
-| Endpoint | `client.search()` via SDK |
-| Query | `"<company> latest news funding hiring 2024 2025"` |
-| Options | `maxResults: 3`, `searchDepth: "basic"` |
-| Output | Top 3 result snippets concatenated, truncated to 500 chars |
-
-Raw snippets are passed to Gemini `extractFacts()` to distil into a single actionable signal sentence stored in Attio.
-
----
+Enrich job — finds a "why now" signal per company; raw snippets are distilled by Gemini `extractFacts()` into a single signal sentence stored in Attio.
 
 ### Lob (REST v1)
-
-Submits the finished postcard for physical printing and mailing.
 
 | | |
 |---|---|
 | Endpoint | `POST https://api.lob.com/v1/postcards` |
-| Auth | Basic auth — `lobApiKey` as username, blank password |
-| Size | `6x11` |
-| Front | HTML with embedded Gemini-generated image |
-| Back | HTML with personalised copy + URL |
-| QR code | Native Lob `qr_code` object — redirects to `/r/:trackingId` |
-| Sandbox | `test_` prefixed key renders a PDF proof instantly, nothing mailed |
-| Returns | `id` (postcard ID), `url` (proof PDF URL written back to Attio) |
-
----
+| Auth | Basic — API key as username, blank password |
+| Body | `multipart/form-data` — pre-rendered **front + back PNGs** uploaded directly (no hosted URL needed) |
+| Size | `4x6` |
+| QR | Baked into the back PNG by the `qrcode` library (error-correction H), encoding `/r/:trackingId` — never drawn by the image model |
+| Sandbox | `test_` key renders a proof PDF instantly, nothing mailed |
+| Returns | `id` + `url` (proof PDF, written back to Attio + shown in the dashboard) |
 
 ### Apollo.io (REST v1)
 
-Organisation enrichment — free tier endpoint only (people search requires paid plan).
+Org enrichment only — `GET /v1/organizations/enrich?domain=…` with `X-Api-Key` (people search is paid-only; discovery uses seed leads instead).
 
-| | |
-|---|---|
-| Endpoint | `GET https://api.apollo.io/v1/organizations/enrich?domain=<domain>` |
-| Auth | `X-Api-Key` header |
-| Returns | `{name, industry, estimated_num_employees, short_description}` |
+### Resend
 
----
-
-### Resend (`resend` SDK)
-
-Sends the personalised outreach email.
-
-| | |
-|---|---|
-| From | `Strike <onboarding@resend.dev>` |
-| To | Lead email address from seed data |
-| Subject / HTML | Generated by Gemini based on lead + enrichment signal |
-| Returns | `{id}` — logged to Attio activity note |
-
----
+Sends the outreach email — from `Reachd <onboarding@resend.dev>`, subject/HTML by Gemini. (Test sender delivers only to the account owner's inbox until a domain is verified.)
 
 ### Calendly (webhook)
 
-Receives booking events when a prospect clicks through and books a meeting.
-
-| | |
-|---|---|
-| Endpoint on Strike | `POST /api/webhooks/calendly` |
-| Event type | `invitee.created` |
-| Verification | Optional HMAC-SHA256 (`CALENDLY_WEBHOOK_SIGNING_KEY`) |
-| Action | `store.markEngaged(trackingId)` → `sequence_stage = engaged`, `dealStage = "Meeting Booked"`, activity note in Attio |
+`POST /api/webhooks/calendly` — on `invitee.created`, ties back via `utm_content=<trackingId>` → `markEngaged()` → `sequence_stage = engaged`, deal → `Meeting Booked`, activity note. Optional HMAC verification.
 
 ---
 
-## Data flow — end to end
+## Postcard generation pipeline (`lib/postcard/`, 6 stages)
+
+Runs inside the outreach job, fully autonomously. A failed pre-send check is the only intervention point — it sets `mail_status = needs_human` (and routes the lead to `needs_review`) instead of sending. Every stage has a deterministic fallback, so the pipeline runs end-to-end with zero keys.
 
 ```
-User → ICP Chat UI
-         │
-         ▼
-POST /api/icp/chat  ─── Gemini parseIcp() ─────────────────► ICP stored in memory
-         │
-         ▼
-POST /api/jobs/discover
-   For each seed lead:
-   ├── Gemini scoreLead(lead, icp) ─────────────────────────► score: 0-100
-   └── store.createLead()
-       ├── Attio: POST /v2/objects/people/records ──────────► person record_id
-       ├── Attio: POST /v2/notes ───────────────────────────► "Lead discovered" note
-       └── Attio: POST /v2/objects/deals/records ──────────► deal record_id
-         │
-         ▼
-POST /api/jobs/enrich
-   For each "discovered" lead:
-   ├── Tavily search("<company> news") ─────────────────────► raw snippets
-   ├── Gemini extractFacts(snippets) ───────────────────────► signal string
-   └── store.updateLead(enrichmentSignal, stage="enriched")
-       └── Attio: PATCH sequence_stage = enriched
-         │
-         ▼
-POST /api/jobs/outreach
-   For each "enriched" lead (email + postcard in parallel):
-   ├── (a) Email
-   │   ├── Gemini writeEmailCopy() ─────────────────────────► {subject, html}
-   │   └── Resend sendEmail() ──────────────────────────────► email delivered
-   │
-   └── (b) Postcard
-       ├── Gemini imagePrompt() ────────────────────────────► {prompt, negative}
-       ├── Gemini generateImage(prompt, trackingId) ─────────► PNG cached to disk
-       ├── GET /api/assets/:trackingId serves it ───────────► image URL for Lob
-       ├── Gemini writePostcardCopy() ──────────────────────► {personalLine, body, cta}
-       └── Lob sendPostcard(front, back, qr_code) ──────────► {id, proofUrl}
-   └── Attio: PATCH sequence_stage = outreach_sent, mail_status = sent
-   └── Attio: POST /v2/notes "Outreach dispatched…"
-         │
-         ▼
-Prospect scans QR (or clicks email link, or books Calendly)
-         │
-         ▼
-GET /r/:trackingId
-   ├── store.markEngaged(trackingId) ───────────────────────► stage = engaged
-   ├── Attio: PATCH sequence_stage = engaged
-   ├── Attio: POST /v2/notes "Booking link clicked"
-   └── 302 redirect → Calendly booking page
-         │
-         ▼
-POST /webhooks/calendly  (on meeting booked)
-   ├── store.markEngaged(trackingId, "Meeting Booked") ─────► dealStage = Meeting Booked
-   ├── Attio: PATCH deal stage
-   └── Attio: POST /v2/notes "Meeting booked"
+Input: MailInput { prospect, enrichment[], brand_kit, tracking_id, booking_url, attio_record_id }
+        │
+Stage 1 — Distil        Gemini picks the single strongest, verifiably-true hook (or null).
+        │               → {hook, hook_source, brand_cues, tone, why_relevant}
+Stage 2 — Copy          Warm, non-salesy front-of-card copy within tight slot budgets.
+        │               → {headline ≤6w, personal_line, body ≤150 chars, cta, sign_off}
+Stage 3a — Image prompt Art-directs the hero image; fixed-zone constraints (dark lower third
+        │               for the headline, clean upper-left for the logo) injected in code.
+Stage 3b — Image        Gemini hero render (3-pro-image → flash fallback → gradient placeholder),
+        │               cached by tracking_id.
+Stage 4 — Compose       Deterministic, code not AI — sharp composites the image + headline + logo
+        │               (front) and copy + real QR (back); pdf-lib builds the proof PDF. 4×6 @ 300dpi.
+Stage 5 — Checks        hook non-null · headline ≤8 words · body ≤150 chars · image present ·
+        │               QR decodes back to booking_url (jsQR).  Any fail → needs_human.
+Stage 6 — Send          Lob test-mode: upload front + back PNGs → proof URL.
+
+Output: MailResult { trackingId, mailStatus, proofUrl, copy, brief }
 ```
+
+The composed front PNG is kept in memory and served at `GET /api/assets/:trackingId` so the dashboard can preview it.
 
 ---
 
-## Postcard generation pipeline (6 stages)
+## Frontend
 
-The postcard module (`yewen` branch) runs fully autonomously. A failed automated check is the only intervention point — it sets `mail_status = needs_human` instead of sending.
+Single client flow in `app/page.tsx`: **ICP chat → radar loading → dashboard**.
 
-```
-Input: MailInput
-  prospect: {name, title, company, industry, email, postal_address}
-  enrichment: [{signal, source_url, published_date}]
-  brand_kit:  {palette, fonts, logo_url}
-  tracking_id: "trk_…"
-  booking_url: "https://…/r/:trackingId"
-  attio_record_id: "<uuid>"
-        │
-        ▼
-Stage 1 — Distil  [lib: distil.ts]
-  Gemini picks the single strongest, most specific, verifiably-true hook from the
-  enrichment signals. Never invents facts. hook = null if nothing qualifies.
-  Output: {hook, hook_source, brand_cues{palette, visual_style, sector}, tone, why_relevant}
-        │
-        ▼
-Stage 2 — Copy  [lib: copy.ts]
-  Gemini writes warm, non-salesy direct-mail copy referencing the hook naturally.
-  Output: {headline (≤8 words), personal_line, body (2-3 sentences), cta, sign_off}
-        │
-        ▼
-Stage 3a — Image prompt  [lib: imagePrompt.ts]
-  Gemini art-directs the front image. CRITICAL: no text/logos/QR in prompt.
-  Output: {image_prompt, negative_prompt, aspect_ratio}
-        │
-        ▼
-Stage 3b — Image generation  [lib: generateImage.ts]
-  Gemini generates the image. Cached to out/cache/<trackingId>.png.
-  Falls back to a branded gradient placeholder on failure.
-        │
-        ▼
-Stage 4 — Compose  [lib: compose.ts]
-  pdf-lib + sharp build the print-ready PDF:
-  Front: generated image + headline overlay + brand logo (if provided)
-  Back:  personal_line + body + CTA + QR code pointing at booking_url
-  Output: postcard.pdf saved to out/<trackingId>/
-        │
-        ▼
-Stage 5 — Automated checks  [lib: checks.ts]
-  ✓ hook is non-null
-  ✓ headline ≤ 8 words
-  ✓ body ≤ 320 characters
-  ✓ front image present at correct dimensions
-  ✓ QR decodes back to the correct booking URL (jsqr)
-  Any fail → mail_status = needs_human
-  All pass → Stage 6
-        │
-        ▼
-Stage 6 — Send  [lib: send.ts]
-  Lob test-mode: submits front + back HTML, returns proof PDF URL.
-  Attio: PATCH mail_status = sent, sequence_stage = outreach_sent
-  Attio: POST /v2/notes with proof URL
+- **ICP chat** — describe your ideal customer in plain English; Gemini parses it into confirmation chips. "Start finding leads" fires discover.
+- **Loading** — radar + rotating phrases; polls `/api/status` every 3s, transitions when leads appear.
+- **Dashboard**
+  - *Discovery tab* — card grid: name, company, ICP match score, source badge.
+  - *Pipeline tab* — per-lead 5-step stepper (Discovered → Enriched → Outreach → Engaged → Booked). **Run enrich / Run outreach** advance everyone; each row also has its own **Enrich →** / **Reach out →** button to advance one lead (great for demos). Review banner when any lead hits `needs_review`; confetti on the first Meeting Booked.
+  - *Lead detail* — slide-over with activity timeline, postcard proof, "Open in Attio".
+  - *Postcard review* — modal for `needs_review` leads (front/back preview, approve / request changes).
 
-Output: MailResult
-  {tracking_id, attio_record_id, mail_status, pdfPath, lob_id, proof_url}
-```
-
-Every stage degrades gracefully — if Gemini is unavailable, deterministic mock outputs keep the pipeline runnable end-to-end with zero API keys.
-
----
-
-## Frontend screens
-
-**ICP Chat** — User types their ideal customer profile in plain English. Gemini parses it into structured criteria (titles, industries, headcount range) shown as confirmation chips. "Start finding leads" fires the discover job.
-
-**Loading** — Animated radar screen with rotating status phrases. Polls `/api/status` every 3 seconds and transitions to the dashboard automatically when leads appear.
-
-**Pipeline Dashboard**
-- Discovery tab: Card grid — name, company, ICP match score, source badge.
-- Pipeline tab: Per-lead 5-step stepper (Discovered → Enriched → Outreach → Engaged → Booked). "Run enrich" and "Run outreach" buttons advance the pipeline. Review banner appears when any lead reaches `needs_review`.
-- Lead detail: Slide-over panel with activity timeline, postcard proof PDF link, "Open in Attio" deep link.
-- Postcard review: Modal for `needs_review` leads showing front/back preview with Approve / Request changes actions.
-- Confetti fires on first `Meeting Booked` lead detected.
-
-The frontend works with **zero backend** — all API calls fall back to fixture data in `lib/fixture.ts` on network error, so the UI never goes blank during a demo.
-
-The brand name **Reachd** is used throughout the app — from address on emails/postcards, activity notes posted to Attio, and the dashboard UI.
+The frontend works with **zero backend** — every API call falls back to `lib/fixture.ts` on network error, so the UI never goes blank during a demo.
 
 ---
 
@@ -352,76 +216,40 @@ The brand name **Reachd** is used throughout the app — from address on emails/
 
 | Layer | Technology |
 |---|---|
-| Frontend framework | Next.js 16 (App Router), React 19, TypeScript 5 |
+| App framework | Next.js 16 (App Router), React 19, TypeScript 5 — UI **and** API in one app |
 | Styling | Tailwind CSS v4, shadcn/ui |
-| Data fetching | SWR |
 | AI / LLM | Google Gemini (`@google/genai`) |
 | Web research | Tavily (`@tavily/core`) |
-| Email delivery | Resend |
-| Physical mail | Lob |
-| CRM / database | Attio REST API v2 |
-| Lead sourcing | Apollo.io (org enrichment, free tier) |
-| PDF generation | pdf-lib |
-| Image processing | sharp |
-| QR generation | qrcode |
-| QR verification | jsqr |
-| Runtime | Node.js 20+ |
+| Email | Resend · **Physical mail** Lob · **Lead sourcing** Apollo (org enrich) |
+| CRM / database | Attio REST API v2 (only datastore) |
+| Image / QR / PDF | sharp · qrcode · jsqr · pdf-lib |
+| Deploy | Vercel (single project) |
 
 ---
 
-## Attio workspace setup
-
-All lead data lives in Attio — no separate database. Six custom attributes must exist on the **Person** object:
-
-| Attribute slug | Type | Values |
-|---|---|---|
-| `sequence_stage` | Text | `discovered` · `enriched` · `outreach_sent` · `engaged` · `needs_review` |
-| `mail_status` | Text | `ready_to_send` · `sent` · `needs_human` |
-| `source` | Text | `seed` · `apollo` · `attio_lookalike` |
-| `icp_match_score` | Number | 0–100 |
-| `tracking_id` | Text | UUID minted at discovery, encoded into QR |
-| `last_touch_at` | Text | ISO 8601 timestamp |
+## Running the demo
 
 ```bash
-# Create all attributes automatically:
-ATTIO_API_KEY=your_key node scripts/attio-setup.mjs
-```
+npm install && npm run dev          # http://localhost:3000
 
-Or manually: Attio Settings → Objects → People → Attributes → Add attribute.
+# 1. Describe your ICP, e.g. "VP Sales at fintech companies, 50–500 employees" → Start finding leads
+#    → discover: 6 seed leads scored by Gemini, created in Attio
 
----
+# 2. Advance the pipeline — top "Run enrich" / "Run outreach", or a single row's button:
+#    enrich   → Tavily signal + Gemini distil → enrichmentSignal in Attio
+#    outreach → Gemini email (Resend) + postcard (image → compose → QR → Lob proof) together
 
-## Running the full demo sequence
-
-```bash
-# 1. Start the app
-git checkout ali/noref/backend
-npm install && npm run dev    # http://localhost:3000
-
-# 2. Open http://localhost:3000 and describe your ICP, e.g.:
-#    "VP Sales or Head of Revenue at fintech companies, 50-500 employees"
-
-# 3. Click "Start finding leads"
-#    → discover job runs: 6 seed leads scored and created in Attio
-
-# 4. Click "Run enrich"
-#    → Tavily fetches a news signal per company; Gemini distils it
-#    → enrichmentSignal written to each Attio person record
-
-# 5. Click "Run outreach"
-#    → Gemini writes personalised email + postcard copy per lead
-#    → Resend delivers the email
-#    → Gemini generates the front image (cached)
-#    → Lob test-mode sends the postcard; proof PDF URL stored in Attio
-
-# 6. Simulate a QR scan (or click the tracked link):
+# 3. Simulate engagement (QR scan / tracked link):
 curl http://localhost:3000/r/<trackingId>
-#    → Lead flips to "engaged" in Attio + activity note posted
-#    → Dashboard stepper advances; redirects to Calendly booking page
+#    → lead flips to "engaged" in Attio + note; redirects to Calendly
 
-# 7. Book a real Calendly meeting (if webhook tunnel is configured):
-#    → Deal stage flips to "Meeting Booked"
-#    → Confetti fires on the dashboard
+# 4. Book a Calendly meeting (with webhook configured) → deal "Meeting Booked" + confetti
 ```
 
-Every stage write is visible in real time in your Attio workspace — activity feed, custom attributes, deal stage — even before the dashboard refreshes.
+Every write is visible in real time in Attio — group the People view by `sequence_stage` to watch records move through the pipeline on camera.
+
+---
+
+## Deploy (Vercel)
+
+Push to GitHub → import the repo to Vercel → paste the same env vars → deploy. One project serves both the UI and the API. With `ATTIO_API_KEY` set, Attio is the source of truth, so the stateless serverless environment is fine. (The in-memory store is per-process and only persists across requests in a single `next dev` session.)
