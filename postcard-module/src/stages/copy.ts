@@ -5,7 +5,10 @@ import type { Brief, Copy, Prospect } from "../types.js";
 // nudge to the booking link/QR. No hard pitch. The CTA points at the QR/tracked
 // link, not Calendly by name (the redirect decides where it lands).
 
-const SYSTEM = `You write short, warm, non-salesy direct-mail copy for a cold prospect who may have received a teaser that something physical was coming. Reference the hook naturally — show we paid attention. Build curiosity and nudge them to the booking link. No hard pitch. Keep it postcard-short. Output JSON only.`;
+const SYSTEM = `You write short, warm, non-salesy direct-mail copy for a cold prospect who may have received a teaser that something physical was coming. Reference the hook naturally — show we paid attention. Build curiosity and nudge them to the booking link. No hard pitch. Keep it postcard-short.
+
+Output ONLY valid JSON matching this exact schema — no wrapper keys, no extra nesting:
+{"headline":"<≤8 words, hook-led>","personal_line":"<1 sentence>","body":"<2-3 sentences>","cta":"<1 sentence nudging them to scan the QR>","sign_off":"<short sign-off>"}`;
 
 export async function writeCopy(brief: Brief, prospect: Prospect): Promise<{ copy: Copy; via: string }> {
   const mock = (): Copy => {

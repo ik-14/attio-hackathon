@@ -5,12 +5,7 @@ const bool = (v: string | undefined, def = false) =>
 
 export const config = {
   text: {
-    provider: (process.env.TEXT_LLM_PROVIDER ?? "sie") as "sie" | "gemini" | "mock",
-    sie: {
-      baseUrl: process.env.SIE_BASE_URL ?? "https://api.superlinked.com",
-      apiKey: process.env.SIE_API_KEY ?? "",
-      model: process.env.SIE_TEXT_MODEL ?? "Qwen/Qwen3-4B-Instruct-2507",
-    },
+    provider: (process.env.TEXT_LLM_PROVIDER ?? "gemini") as "gemini" | "mock",
     gemini: {
       apiKey: process.env.GEMINI_API_KEY ?? "",
       model: process.env.GEMINI_TEXT_MODEL ?? "gemini-3.5-flash",

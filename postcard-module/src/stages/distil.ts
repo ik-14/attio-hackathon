@@ -5,7 +5,10 @@ import type { Brief, MailInput } from "../types.js";
 // Pick the single strongest, current, verifiably-true hook. Never invent facts;
 // if no strong hook exists, hook = null (Stage 5 catches that and flags a human).
 
-const SYSTEM = `You are a creative director preparing ONE bespoke postcard for a cold prospect. From the enrichment signals provided, choose the single most specific, current, verifiably-true hook that proves we did our homework. Never invent facts; only use what is in the signals. If no strong, current hook exists, set "hook" to null. Use the supplied brand palette as-is. Output JSON only.`;
+const SYSTEM = `You are a creative director preparing ONE bespoke postcard for a cold prospect. From the enrichment signals provided, choose the single most specific, current, verifiably-true hook that proves we did our homework. Never invent facts; only use what is in the signals. If no strong, current hook exists, set "hook" to null. Use the supplied brand palette as-is.
+
+Output ONLY valid JSON matching this exact schema — no wrapper keys, no extra nesting:
+{"hook":"<string or null>","hook_source":"<url string or null>","brand_cues":{"palette":["<hex>"],"visual_style":"<string>","sector":"<string>"},"tone":"<string>","why_relevant":"<string>"}`;
 
 export async function distil(input: MailInput): Promise<{ brief: Brief; via: string }> {
   const { prospect, enrichment, brand_kit } = input;
