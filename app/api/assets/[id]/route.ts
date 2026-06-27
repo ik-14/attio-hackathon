@@ -2,7 +2,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 import { CORS_HEADERS, options } from "@/lib/cors";
-import { getCachedImage } from "@/lib/clients/geminiClient";
+import { getPostcardImage } from "@/lib/postcard/run";
 
 export function OPTIONS() {
   return options();
@@ -14,7 +14,7 @@ export async function GET(
 ) {
   const { id } = await ctx.params;
 
-  const buf = getCachedImage(id);
+  const buf = getPostcardImage(id);
   if (!buf) {
     return new Response("not found", { status: 404, headers: CORS_HEADERS });
   }

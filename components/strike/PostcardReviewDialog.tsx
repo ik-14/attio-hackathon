@@ -96,7 +96,7 @@ export function PostcardReviewDialog({
     setLoading(true);
     await regenPostcard(lead.attioRecordId);
     setLoading(false);
-    toast(`Flagged for changes — Strike will regenerate ${lead.name}'s postcard`);
+    toast(`Flagged for changes — Reachd will regenerate ${lead.name}'s postcard`);
     onClose();
   }
 

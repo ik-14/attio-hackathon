@@ -60,15 +60,6 @@ function hashScore(s: string): number {
   return 70 + (Math.abs(h) % 26);
 }
 
-// Minimal valid 1×1 transparent PNG
-const STUB_PNG = Buffer.from(
-  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
-  "base64"
-);
-
-// Module-level image cache keyed by trackingId / cacheKey
-const imageCache = new Map<string, Buffer>();
-
 // ── Public API ────────────────────────────────────────────────────────────────
 
 export async function parseIcp(message: string): Promise<Icp> {
@@ -142,90 +133,6 @@ export async function writeEmailCopy(brief: {
       required: ["subject", "html"],
     }
   );
-}
-
-export async function writePostcardCopy(brief: {
-  name: string;
-  company: string;
-  signal: string;
-}): Promise<{ personalLine: string; body: string; cta: string }> {
-  if (!has.gemini()) {
-    console.log(`[gemini stub] writePostcardCopy for ${brief.name}`);
-    return {
-      personalLine: `Congrats on ${brief.signal}.`,
-      body: `We help ${brief.company}-stage teams close deals faster with autonomous outbound. 15 mins could change your quarter.`,
-      cta: "Scan to book a call →",
-    };
-  }
-  return generateJson<{ personalLine: string; body: string; cta: string }>(
-    `Write postcard copy (max 3 short sentences) for a physical direct-mail piece to ${brief.name} at ${brief.company}. Signal hook: "${brief.signal}". Return: personalLine (1 line referencing the signal), body (2 lines selling the value), cta (call-to-action for the QR code).`,
-    {
-      type: Type.OBJECT,
-      properties: {
-        personalLine: { type: Type.STRING },
-        body: { type: Type.STRING },
-        cta: { type: Type.STRING },
-      },
-      required: ["personalLine", "body", "cta"],
-    }
-  );
-}
-
-export async function imagePrompt(brief: {
-  company: string;
-  industry: string;
-}): Promise<{ prompt: string; negative: string }> {
-  if (!has.gemini()) {
-    return {
-      prompt: `Professional direct mail postcard for ${brief.industry} company ${brief.company}, clean modern design, blue and white`,
-      negative: "text, words, letters, low quality",
-    };
-  }
-  return generateJson<{ prompt: string; negative: string }>(
-    `Write an image generation prompt for a postcard visual targeting ${brief.company} in ${brief.industry}. Keep it short, artistic, and professional. No text in image. Also return a negative prompt.`,
-    {
-      type: Type.OBJECT,
-      properties: {
-        prompt: { type: Type.STRING },
-        negative: { type: Type.STRING },
-      },
-      required: ["prompt", "negative"],
-    }
-  );
-}
-
-export async function generateImage(prompt: string, cacheKey: string): Promise<Buffer> {
-  if (imageCache.has(cacheKey)) return imageCache.get(cacheKey)!;
-
-  if (!has.gemini()) {
-    console.log(`[gemini stub] generateImage for ${cacheKey}`);
-    imageCache.set(cacheKey, STUB_PNG);
-    return STUB_PNG;
-  }
-
-  try {
-    const response = await withRetry(() =>
-      ai().models.generateContent({
-        model: MODELS.image,
-        contents: prompt,
-        config: { responseModalities: ["IMAGE"] },
-      })
-    );
-    const parts = response.candidates?.[0]?.content?.parts ?? [];
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const inline = parts.find((p: any) => p.inlineData?.data);
-    const buf = inline ? Buffer.from(inline.inlineData!.data as string, "base64") : STUB_PNG;
-    imageCache.set(cacheKey, buf);
-    return buf;
-  } catch (err) {
-    console.warn(`[gemini] generateImage failed, using stub:`, (err as Error).message);
-    imageCache.set(cacheKey, STUB_PNG);
-    return STUB_PNG;
-  }
-}
-
-export function getCachedImage(cacheKey: string): Buffer | null {
-  return imageCache.get(cacheKey) ?? null;
 }
 
 export async function extractFacts(text: string): Promise<{ signal: string }> {

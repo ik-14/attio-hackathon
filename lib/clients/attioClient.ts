@@ -94,7 +94,7 @@ export async function addActivityNote(
     data: {
       parent_object: "people",
       parent_record_id: recordId,
-      title: "Strike agent",
+      title: "Reachd agent",
       content: note,
       format: "plaintext",
     },

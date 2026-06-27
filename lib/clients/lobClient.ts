@@ -25,7 +25,7 @@ export interface PostcardParams {
 }
 
 const FROM_ADDRESS: PostcardAddress = {
-  name: "Strike HQ",
+  name: "Reachd HQ",
   address_line1: "760 Market St Ste 900",
   address_city: "San Francisco",
   address_state: "CA",
@@ -45,7 +45,7 @@ export async function sendPostcard(params: PostcardParams): Promise<{ proofUrl: 
   const response = await axios.post(
     "https://api.lob.com/v1/postcards",
     {
-      description: `Strike outreach — ${params.to.name}`,
+      description: `Reachd outreach — ${params.to.name}`,
       to: params.to,
       from: FROM_ADDRESS,
       size: "6x11",

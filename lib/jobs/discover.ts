@@ -35,6 +35,10 @@ export async function runDiscover(): Promise<DiscoverSummary> {
       sequenceStage: "discovered",
       dealStage: "Lead",
       mailStatus: "ready_to_send",
+      title: seed.title,
+      companyDomain: seed.domain,
+      industry: seed.industry,
+      postalAddress: seed.postalAddress,
     });
 
     summary.created++;

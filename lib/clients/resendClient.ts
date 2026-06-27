@@ -19,7 +19,7 @@ export async function sendEmail(params: {
     return { id: `stub-email-${Math.random().toString(36).slice(2, 10)}` };
   }
   const { data, error } = await client().emails.send({
-    from: "Strike <onboarding@resend.dev>",
+    from: "Reachd <onboarding@resend.dev>",
     to: params.to,
     subject: params.subject,
     html: params.html,

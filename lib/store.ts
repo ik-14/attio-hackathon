@@ -52,7 +52,7 @@ export async function createLead(input: CreateLeadInput): Promise<Lead> {
     try {
       await attio.addActivityNote(
         attioRecordId,
-        `Lead discovered by Strike agent. Score: ${input.icpMatchScore}. Source: ${input.source}.`
+        `Lead discovered by Reachd agent. Score: ${input.icpMatchScore}. Source: ${input.source}.`
       );
     } catch (err) {
       console.warn("[store] Attio addActivityNote failed:", (err as Error).message);

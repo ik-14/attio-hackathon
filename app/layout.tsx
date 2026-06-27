@@ -10,9 +10,9 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Strike — Autonomous outreach for Attio",
+  title: "Reachd — Autonomous outreach for Attio",
   description:
-    "Strike finds, enriches, and reaches out to your ideal customers automatically — personalised email + postcard, closed in your Attio CRM.",
+    "Reachd finds, enriches, and reaches out to your ideal customers automatically — personalised email + postcard, closed in your Attio CRM.",
 };
 
 export default function RootLayout({

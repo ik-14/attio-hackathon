@@ -1,7 +1,4 @@
-// ~6 seed leads. Hero prospect (index 0) has a real postal address and a
-// placeholder you-own email so Lob / Resend demos work out of the box.
-
-import type { PostcardAddress } from "@/lib/clients/lobClient";
+import type { PostalAddress } from "@/lib/types";
 
 export interface SeedLead {
   name: string;
@@ -10,25 +7,24 @@ export interface SeedLead {
   domain: string;
   industry: string;
   email?: string;
-  address?: PostcardAddress;
+  postalAddress: PostalAddress;
 }
 
 export const SEED_LEADS: SeedLead[] = [
   {
-    // Hero prospect — has postal address + placeholder email
+    // Hero prospect — real postal address + placeholder email for Lob/Resend demo
     name: "Sarah Chen",
     title: "VP of Sales",
     company: "Meridian Fintech",
     domain: "meridianfintech.io",
     industry: "fintech",
     email: "imahmedali+hero@gmail.com",
-    address: {
-      name: "Sarah Chen",
-      address_line1: "760 Market St Ste 300",
-      address_city: "San Francisco",
-      address_state: "CA",
-      address_zip: "94102",
-      address_country: "US",
+    postalAddress: {
+      line1: "760 Market St Ste 300",
+      city: "San Francisco",
+      state: "CA",
+      postcode: "94102",
+      country: "US",
     },
   },
   {
@@ -36,39 +32,74 @@ export const SEED_LEADS: SeedLead[] = [
     title: "Head of Revenue",
     company: "Stackline Analytics",
     domain: "stacklineanalytics.com",
-    industry: "software / analytics",
+    industry: "software",
     email: "imahmedali+lead2@gmail.com",
+    postalAddress: {
+      line1: "300 W 6th St Ste 1500",
+      city: "Austin",
+      state: "TX",
+      postcode: "78701",
+      country: "US",
+    },
   },
   {
     name: "Priya Nair",
     title: "VP Sales",
     company: "Orbital SaaS",
     domain: "orbitalsaas.io",
-    industry: "software / SaaS",
+    industry: "software",
     email: "imahmedali+lead3@gmail.com",
+    postalAddress: {
+      line1: "1201 3rd Ave Ste 2200",
+      city: "Seattle",
+      state: "WA",
+      postcode: "98101",
+      country: "US",
+    },
   },
   {
     name: "James Park",
     title: "Chief Revenue Officer",
     company: "Nexus Cloud",
     domain: "nexuscloud.ai",
-    industry: "cloud software",
+    industry: "software",
     email: "imahmedali+lead4@gmail.com",
+    postalAddress: {
+      line1: "100 Park Ave Fl 16",
+      city: "New York",
+      state: "NY",
+      postcode: "10017",
+      country: "US",
+    },
   },
   {
     name: "Elena Vasquez",
     title: "Head of Sales",
     company: "Vantage Payments",
     domain: "vantagepayments.com",
-    industry: "fintech / payments",
+    industry: "fintech",
     email: "imahmedali+lead5@gmail.com",
+    postalAddress: {
+      line1: "233 S Wacker Dr Ste 4400",
+      city: "Chicago",
+      state: "IL",
+      postcode: "60606",
+      country: "US",
+    },
   },
   {
     name: "David Kim",
     title: "RevOps Director",
     company: "Aperture Data",
     domain: "aperturedata.io",
-    industry: "software / data",
+    industry: "software",
     email: "imahmedali+lead6@gmail.com",
+    postalAddress: {
+      line1: "101 Federal St Ste 1900",
+      city: "Boston",
+      state: "MA",
+      postcode: "02110",
+      country: "US",
+    },
   },
 ];
