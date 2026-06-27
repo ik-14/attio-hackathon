@@ -5,22 +5,37 @@ import type { Brief, Copy, Prospect, SenderContext } from "../types.js";
 // nudge to the booking link/QR. No hard pitch. The CTA points at the QR/tracked
 // link, not Calendly by name (the redirect decides where it lands).
 
-const SYSTEM = `You write short, warm, non-salesy direct-mail copy for a cold prospect who may have received a teaser that something physical was coming. Reference the hook naturally — show we paid attention. Weave in what the sender does (from "sender_context.what_we_do") naturally in the body — one sentence, no jargon, not salesy. Build curiosity and nudge them to scan the QR to book time. No hard pitch.
+// Physical card layout — ALL copy lives on the FRONT, typeset over the hero
+// image. Back is a clean solid brand color (Lob prints address + postage there).
+// Slot budgets are COMFORTABLE TARGETS — aim for these so each field renders at
+// its intended font size, not the scaled-down emergency minimum.
+//
+// FRONT (single side, left column; QR bottom-right corner — code-generated):
+//   headline      — large bold display, ~90px, 3-line box (900px wide)
+//   personal_line — medium opener,      ~40px, 2-line box (900px wide)
+//   body          — body paragraph,     ~34px, 3-line box (900px wide) ← tight!
+//   cta           — bold accent,        ~28px, 2-line box
+//   sign_off      — small italic,               1 line
 
-HARD CHARACTER LIMITS — all text appears on the front of the card, these MUST be respected:
-- headline: max 8 words
-- personal_line: max 80 characters (2 short lines on front)
-- body: max 150 characters (3 short lines on front)
-- cta: max 60 characters (bold accent line above the QR code)
-- sign_off: max 40 characters
+const SYSTEM = `You write short, warm, non-salesy direct-mail copy for a cold prospect who received something physical. Reference the hook naturally — show we paid attention. In the body, weave in one natural sentence about what the sender does (from sender_context.what_we_do) — no jargon, not salesy. Nudge them to scan the QR. No hard pitch.
+
+CARD LAYOUT — everything on the FRONT, typeset over the brand image. No flip side:
+  headline → personal_line → body → cta → sign_off (left column) + QR code (bottom-right, auto-generated).
+
+SLOT BUDGETS — stay within these or the font shrinks and the card looks cramped:
+• headline:      ≤ 6 words preferred (8 words absolute max). Hook-led. Large bold display type. Make it count.
+• personal_line: ≤ 100 characters. Single sentence. The hook reference — shows we did our homework.
+• body:          ≤ 150 characters (~25 words). Warm paragraph. Why this timing matters + one mention of what we do. TIGHT SLOT — every word must earn its place.
+• cta:           ≤ 80 characters (~10 words). "Scan to [book / grab / schedule] a [call / chat / conversation]" — always nudge toward a meeting.
+• sign_off:      ≤ 40 characters (3–5 words). Warm closing.
 
 You MUST respond with a JSON object using EXACTLY these field names:
 {
-  "headline": "<= 8 words, hook-led",
-  "personal_line": "max 100 chars — single punchy sentence referencing the hook",
-  "body": "max 200 chars — why_relevant + natural mention of what we do",
-  "cta": "max 80 chars — nudge to scan the QR",
-  "sign_off": "max 40 chars"
+  "headline": "≤ 6 words, hook-led, large display type — make it count",
+  "personal_line": "≤ 100 chars — single sentence referencing the hook",
+  "body": "≤ 150 chars — warm paragraph: why_relevant + natural sender mention",
+  "cta": "≤ 80 chars — scan to book/schedule a chat",
+  "sign_off": "≤ 40 chars — warm closing"
 }`;
 
 export async function writeCopy(
@@ -35,8 +50,11 @@ export async function writeCopy(
     return {
       headline: brief.hook ? "Saw your news — nice work" : "A note from us to you",
       personal_line: `${hookLine} Genuinely impressive timing.`,
-      body: `${brief.why_relevant} ${sender.what_we_do} We thought a real card beat another email.`,
-      cta: "Scan the code to grab 15 minutes — no pitch, just a chat.",
+      body: (() => {
+        const full = `${brief.why_relevant} ${sender.what_we_do}`;
+        return full.length <= 148 ? full : `${full.slice(0, 145).trimEnd()}…`;
+      })(),
+      cta: "Scan to book a quick chat — no pitch, just a conversation.",
       sign_off: "— Looking forward, the team",
     };
   };

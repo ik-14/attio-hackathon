@@ -12,7 +12,7 @@ import type { Brief, CheckResult, ComposedCard, Copy } from "../types.js";
 const jsQR = ((jsQRModule as any).default ?? jsQRModule) as typeof import("jsqr").default;
 
 const HEADLINE_MAX_WORDS = 8;
-const BODY_MAX_CHARS = 160; // front text box fits ~3 lines at 36px on a 1000px column
+const BODY_MAX_CHARS = 150; // matches the copy prompt target; layout_text_fit is the hard geometric enforcement
 const MIN_PRINT_FONT_SIZE = 20;
 const MIN_QR_PX = 235; // just over 2cm at 300dpi, with the rendered QR currently larger.
 

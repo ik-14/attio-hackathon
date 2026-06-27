@@ -5,11 +5,26 @@ import type { Brief, ImagePrompt } from "../types.js";
 // FRONT image. CRITICAL: no text/letters/logos/QR in the image — those are added
 // deterministically in Stage 4. Leave breathing room for typesetting.
 
-const SYSTEM = `You are a graphic designer commissioning a background for a premium direct-mail postcard. The image must be MINIMAL and ELEGANT — think color-field painting, luxury brand campaign, or fine art print. The dominant color must come from the brand palette provided. The composition should be nearly solid — very subtle texture, soft vignette, or a gentle tonal shift is acceptable, but NO complex scenes, NO objects, NO people, NO architecture. The entire image should feel like breathing room for typography. CRITICAL: absolutely NO text, letters, numbers, logos, watermarks, QR codes, or symbols of any kind. Output JSON only.
+// Two fixed composition zones that code composites over the image every time.
+// The model must treat them as hard constraints, not suggestions:
+//
+//   LOWER THIRD  → a large bold white headline typeset here at ~96px
+//                  (the compose stage overlays a black-to-transparent scrim,
+//                  but the image itself should already support a dark tone here)
+//   UPPER-LEFT   → approx. top 12% height × left 22% width — brand logo composited
+//                  crisply here; this area must be clean and uncluttered
+
+const SYSTEM = `You are a graphic designer commissioning a FRONT background image for a premium direct-mail postcard. The image must be MINIMAL and ELEGANT — think color-field painting, luxury brand campaign, or fine art print. The dominant color must come from the brand palette.
+
+TWO NON-NEGOTIABLE COMPOSITION ZONES:
+1. LOWER THIRD (bottom 35% of frame): must be naturally darker — a deep tonal gradient or vignette toward the bottom — because a large bold white headline (~96px) will be typeset directly over this zone. The darkness must come from the image itself, not only from a code overlay.
+2. UPPER-LEFT CORNER (top ~12% height, left ~22% width): must be clean, minimal, and uncluttered — a brand logo will be composited here at full opacity. No texture, pattern, or gradient focal point in this zone.
+
+OVERALL: near-solid composition — very subtle texture or soft tonal shift is acceptable, but NO complex scenes, NO objects, NO people, NO architecture, NO busy patterns. The entire image is breathing room for typography. CRITICAL: absolutely NO text, letters, numbers, logos, watermarks, QR codes, or symbols anywhere. Output JSON only.
 
 Output schema:
 {
-  "image_prompt": "precise art direction: dominant color, subtle texture/finish, mood — 2-3 sentences max",
+  "image_prompt": "precise art direction: dominant color, lower-third tonal treatment, upper-left clarity, subtle texture/finish, mood — 2-3 sentences",
   "negative_prompt": "exhaustive list of things to exclude",
   "aspect_ratio": "3:2 landscape"
 }`;
